@@ -1,4 +1,4 @@
-"""Pure geometry: turn 21 MediaPipe hand landmarks into a HandPose.
+"""Pure geometry: turn 21 MediaPipe hand landmarks into a HandPose, and group poses into a Scene.
 
 Landmark indices follow MediaPipe: 0 wrist; thumb 1-4 (CMC, MCP, IP, TIP);
 index 5-8, middle 9-12, ring 13-16, pinky 17-20 (MCP, PIP, DIP, TIP).
@@ -12,12 +12,13 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from enum import Enum
-from typing import Mapping
+from typing import Iterable, Literal, Mapping
 
 from handcontrol.config import HandSettings
 
 Point3 = tuple[float, float, float]
 Point2 = tuple[float, float]
+Pointing = Literal["up", "down"] | None
 
 WRIST = 0
 THUMB_CMC, THUMB_MCP, THUMB_IP, THUMB_TIP = 1, 2, 3, 4
@@ -44,8 +45,6 @@ FINGER_JOINTS: dict[Finger, tuple[int, int, int]] = {
     Finger.PINKY: (PINKY_MCP, PINKY_PIP, PINKY_TIP),
 }
 
-FOUR_FINGERS = (Finger.INDEX, Finger.MIDDLE, Finger.RING, Finger.PINKY)
-
 
 @dataclass(frozen=True)
 class RawHand:
@@ -58,27 +57,59 @@ class RawHand:
 @dataclass(frozen=True)
 class HandPose:
     fingers: Mapping[Finger, bool]
-    palm_facing_camera: bool
-    palm_size: float
-    palm_center: Point2
-    two_finger_point: Point2
-    two_fingers_joined: bool
+    hand_width: float          # image-space index MCP <-> pinky MCP; the unit for motion thresholds
+    palm_center: Point2        # image space
+    two_finger_point: Point2   # midpoint of index and middle tips, image space
+    two_fingers_joined: bool   # index tip <-> middle tip within a few cm (world space)
+    direction_deg: float       # image-space wrist -> middle MCP: 0 up, 90 right, +-180 down, -90 left
+    direction_len: float       # |wrist -> middle MCP| in hand widths; small = fingers toward the camera
+    pointing: Pointing         # "up" / "down" when clearly vertical, else None
     t: float
 
+    def _only(self, *extended: Finger) -> bool:
+        """True when exactly these fingers (thumb ignored) are extended."""
+        return all(self.fingers[f] == (f in extended) for f in Finger if f is not Finger.THUMB)
+
     @property
-    def is_open_palm(self) -> bool:
-        """Index..pinky extended and palm toward the camera. The thumb is ignored on purpose."""
-        return self.palm_facing_camera and all(self.fingers[f] for f in FOUR_FINGERS)
+    def is_open_hand(self) -> bool:
+        return self._only(Finger.INDEX, Finger.MIDDLE, Finger.RING, Finger.PINKY)
 
     @property
     def is_two_finger(self) -> bool:
-        return (
-            self.fingers[Finger.INDEX]
-            and self.fingers[Finger.MIDDLE]
-            and self.two_fingers_joined
-            and not self.fingers[Finger.RING]
-            and not self.fingers[Finger.PINKY]
-        )
+        return self._only(Finger.INDEX, Finger.MIDDLE) and self.two_fingers_joined
+
+    @property
+    def is_rock_on(self) -> bool:
+        return self._only(Finger.INDEX, Finger.PINKY)
+
+    @property
+    def is_middle_finger(self) -> bool:
+        return self._only(Finger.MIDDLE)
+
+
+@dataclass(frozen=True)
+class Scene:
+    """Every hand visible in one frame, largest first."""
+
+    hands: tuple[HandPose, ...]
+    t: float
+
+    @property
+    def primary(self) -> HandPose | None:
+        return self.hands[0] if self.hands else None
+
+    @property
+    def single(self) -> HandPose | None:
+        return self.hands[0] if len(self.hands) == 1 else None
+
+    @property
+    def pair(self) -> tuple[HandPose, HandPose] | None:
+        return (self.hands[0], self.hands[1]) if len(self.hands) >= 2 else None
+
+
+def make_scene(poses: Iterable[HandPose], t: float) -> Scene:
+    ordered = sorted(poses, key=lambda p: p.hand_width, reverse=True)
+    return Scene(hands=tuple(ordered[:2]), t=t)
 
 
 def distance(a, b) -> float:
@@ -102,29 +133,9 @@ def finger_extended(world: list[Point3], finger: Finger, min_angle_deg: float) -
     return angle_deg(world[root], world[joint], world[tip]) >= min_angle_deg
 
 
-def palm_facing_camera(landmarks: list[Point3], handedness: str) -> bool:
-    """True when the palm, not the back of the hand, faces the camera.
-
-    Uses the 2-D cross product of wrist->index_mcp and wrist->pinky_mcp in
-    image space (y down). The sign convention was measured on MediaPipe's own
-    sample photos (gesture_recognizer/victory.jpg and pointing_up.jpg, both
-    palms toward the camera): a hand labelled "Right" with its palm visible
-    has the thumb on the image RIGHT, so index_mcp sits right of pinky_mcp and
-    the cross product is negative; a "Left" palm mirrors that. The back of a
-    hand flips the sign. Note this is the opposite of what the MediaPipe docs'
-    "labels assume a mirrored image" remark suggests; the measurement wins,
-    and it is re-checked live in the preview window (plan Task 12).
-    """
-    w, i, p = landmarks[WRIST], landmarks[INDEX_MCP], landmarks[PINKY_MCP]
-    ux, uy = i[0] - w[0], i[1] - w[1]
-    vx, vy = p[0] - w[0], p[1] - w[1]
-    z = ux * vy - uy * vx
-    return z < 0 if handedness == "Right" else z > 0
-
-
-def palm_size(landmarks: list[Point3]) -> float:
-    """Image-space wrist -> middle MCP distance; the unit for all motion thresholds."""
-    return distance(landmarks[WRIST][:2], landmarks[MIDDLE_MCP][:2])
+def hand_width(landmarks: list[Point3]) -> float:
+    """Image-space knuckle width (index MCP <-> pinky MCP). Stays visible whichever way the fingers point."""
+    return distance(landmarks[INDEX_MCP][:2], landmarks[PINKY_MCP][:2])
 
 
 def palm_center(landmarks: list[Point3]) -> Point2:
@@ -132,15 +143,42 @@ def palm_center(landmarks: list[Point3]) -> Point2:
     return (sum(landmarks[i][0] for i in idx) / 5, sum(landmarks[i][1] for i in idx) / 5)
 
 
+def direction(landmarks: list[Point3], width: float) -> tuple[float, float]:
+    """(angle in degrees, length in hand widths) of the image-space wrist -> middle MCP vector.
+
+    Angle: 0 = fingers up, 90 = right, +-180 = down, -90 = left. Length near 0
+    means the hand is foreshortened (fingers toward or away from the camera).
+    """
+    dx = landmarks[MIDDLE_MCP][0] - landmarks[WRIST][0]
+    dy = landmarks[MIDDLE_MCP][1] - landmarks[WRIST][1]
+    deg = math.degrees(math.atan2(dx, -dy)) if (dx or dy) else 0.0
+    length = math.hypot(dx, dy) / width if width > 0 else 0.0
+    return deg, length
+
+
+def pointing(direction_deg: float, direction_len: float, settings: HandSettings) -> Pointing:
+    if direction_len < settings.min_direction_len:
+        return None
+    if abs(direction_deg) <= settings.vertical_max_deg:
+        return "up"
+    if 180.0 - abs(direction_deg) <= settings.vertical_max_deg:
+        return "down"
+    return None
+
+
 def pose_from_raw(raw: RawHand, t: float, settings: HandSettings) -> HandPose:
     fingers = {f: finger_extended(raw.world, f, settings.finger_extended_angle_deg) for f in Finger}
     index_tip, middle_tip = raw.landmarks[INDEX_TIP], raw.landmarks[MIDDLE_TIP]
+    width = hand_width(raw.landmarks)
+    deg, length = direction(raw.landmarks, width)
     return HandPose(
         fingers=fingers,
-        palm_facing_camera=palm_facing_camera(raw.landmarks, raw.handedness),
-        palm_size=palm_size(raw.landmarks),
+        hand_width=width,
         palm_center=palm_center(raw.landmarks),
         two_finger_point=((index_tip[0] + middle_tip[0]) / 2, (index_tip[1] + middle_tip[1]) / 2),
         two_fingers_joined=distance(raw.world[INDEX_TIP], raw.world[MIDDLE_TIP]) <= settings.fingers_joined_max_m,
+        direction_deg=deg,
+        direction_len=length,
+        pointing=pointing(deg, length, settings),
         t=t,
     )

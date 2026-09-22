@@ -1,16 +1,13 @@
 """Builds synthetic RawHand objects for unit tests (no camera, no MediaPipe).
 
-World space is metres with the wrist at the origin; y grows downward like the
-image, so the hand points "up" along -y and a curled finger folds toward +z.
-Image landmarks are the world layout scaled by 1.25 around ``center``, so the
-palm size (wrist -> middle MCP, 0.08 m) comes out at exactly 0.1 image units.
-
-Handedness and mirroring: as measured on MediaPipe's sample photos (see
-handcontrol.hand.palm_facing_camera), a hand labelled "Right" with its palm
-toward the camera has the thumb on the image RIGHT, and a "Left" palm has it
-on the image LEFT. The base layout below puts the thumb at negative x (a
-"Left" palm); x is mirrored whenever the requested label/facing combination
-needs the thumb on the other side.
+The base layout is an upright hand in metres with the wrist at the origin and
+y growing downward like the image, so the hand points "up" along -y and a
+curled finger folds toward +z. ``direction`` rotates that layout rigidly
+("down", "camera" = fingers toward the lens, "side" = fingers to the right),
+and the image landmarks are the rotated x/y scaled by ``scale`` around
+``center``, so foreshortening happens naturally: a hand pointing at the camera
+has almost no wrist-to-knuckle length in the image, but its knuckle width
+(index MCP to pinky MCP, 0.06 m -> 0.06 * scale image units) is unchanged.
 """
 
 from __future__ import annotations
@@ -29,6 +26,13 @@ _JOINTS = {
 _UP = (0.0, -1.0, 0.0)
 _FOLD = (0.0, 0.0, 1.0)
 
+_ROTATIONS = {
+    "up": lambda x, y, z: (x, y, z),
+    "down": lambda x, y, z: (x, -y, -z),      # 180 degrees about x
+    "camera": lambda x, y, z: (x, -z, y),     # 90 degrees about x: up becomes toward the lens
+    "side": lambda x, y, z: (-y, x, z),       # 90 degrees about z: up becomes right
+}
+
 
 def _step(p, d, k):
     return (p[0] + d[0] * k, p[1] + d[1] * k, p[2] + d[2] * k)
@@ -38,9 +42,10 @@ def build_hand(
     extended: frozenset[Finger] | set[Finger] = ALL_FINGERS,
     *,
     spread: bool = False,
-    handedness: str = "Right",
-    facing: bool = True,
+    direction: str = "up",
     center: tuple[float, float] = (0.5, 0.5),
+    scale: float = 1.25,
+    handedness: str = "Right",
 ) -> RawHand:
     world = [(0.0, 0.0, 0.0)] * 21
     # Thumb: CMC(1), MCP(2), IP(3), TIP(4). Extended = pointing up-left; curled = folded across the palm.
@@ -61,7 +66,7 @@ def build_hand(
         world[pip] = _step(base, proximal, 0.03)
         world[dip] = _step(world[pip], distal, 0.025)
         world[tip] = _step(world[pip], distal, 0.05)
-    mirror = (handedness == "Right") == facing
-    sx = -1.25 if mirror else 1.25
-    landmarks = [(center[0] + x * sx, center[1] + y * 1.25, z) for x, y, z in world]
+    rotate = _ROTATIONS[direction]
+    world = [rotate(*p) for p in world]
+    landmarks = [(center[0] + x * scale, center[1] + y * scale, z) for x, y, z in world]
     return RawHand(landmarks=landmarks, world=world, handedness=handedness, score=0.99)

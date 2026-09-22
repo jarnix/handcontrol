@@ -1,5 +1,10 @@
 # HandControl
 
+> **Status: in development.** Gestures are being brought up one at a time against real
+> webcam recordings. Only volume control is enabled by default right now; the other
+> gestures exist but are switched off until each one is tuned. Expect thresholds and
+> gesture choices to change.
+
 Control Windows with your hands. A system-tray app that watches your webcam
 with Google MediaPipe hand tracking and turns hand gestures into input.
 

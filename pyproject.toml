@@ -4,6 +4,12 @@ version = "0.1.0"
 description = "Control Windows with your hands: MediaPipe hand gestures from a system tray app"
 readme = "README.md"
 requires-python = ">=3.13"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Win32 (MS Windows)",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3.13",
+]
 dependencies = [
     "mediapipe>=1.0.1,<2",
     "opencv-python>=4.10",

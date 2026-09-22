@@ -24,8 +24,10 @@ def _all_gestures(s: Settings) -> list[Gesture]:
         TwoFingerScroll(s.scroll),
         HoldGesture("youtube", rock_on, OpenUrl(s.youtube.url), s.youtube.hold_frames, s.youtube.cooldown_s),
         HoldGesture("show_desktop", middle_finger, SHOW_DESKTOP, s.show_desktop.hold_frames, s.show_desktop.cooldown_s),
-        RepeatGesture("volume_up", volume_up, VOLUME_UP, s.volume.engage_frames, s.volume.repeat_frames),
-        RepeatGesture("volume_down", volume_down, VOLUME_DOWN, s.volume.engage_frames, s.volume.repeat_frames),
+        RepeatGesture("volume_up", volume_up, VOLUME_UP,
+                      s.volume.engage_frames, s.volume.repeat_frames, s.volume.release_frames),
+        RepeatGesture("volume_down", volume_down, VOLUME_DOWN,
+                      s.volume.engage_frames, s.volume.repeat_frames, s.volume.release_frames),
     ]
 
 

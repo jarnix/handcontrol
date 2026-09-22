@@ -21,6 +21,30 @@ def test_degenerate_angle_is_zero():
     assert angle_deg((0, 0, 0), (0, 0, 0), (1, 0, 0)) == 0.0
 
 
+def test_extended_rule_combines_bend_angle_and_tip_ratio():
+    from handcontrol.hand import extended_by_rule
+
+    s = HandSettings()  # angle >= 130 or, when not foreshortened, ratio >= 1.2
+    assert extended_by_rule(angle=140.0, ratio=1.0, direction_len=1.3, settings=s)      # straight enough in 3D
+    assert extended_by_rule(angle=110.0, ratio=1.3, direction_len=1.3, settings=s)      # tip well beyond the knuckle
+    assert not extended_by_rule(angle=110.0, ratio=1.3, direction_len=0.2, settings=s)  # foreshortened: ratio ignored
+    assert not extended_by_rule(angle=110.0, ratio=1.0, direction_len=1.3, settings=s)  # neither
+
+
+def test_finger_ratios_are_exposed():
+    assert pose().finger_ratios[Finger.INDEX] == pytest.approx(0.1612 / 0.1118, abs=0.01)
+    assert pose(extended=set()).finger_ratios[Finger.INDEX] == pytest.approx(1.0)
+
+
+def test_finger_angles_are_exposed():
+    open_angles = pose().finger_angles
+    fist_angles = pose(extended=set()).finger_angles
+    for f in (Finger.INDEX, Finger.MIDDLE, Finger.RING, Finger.PINKY):
+        assert open_angles[f] == pytest.approx(180.0)
+        assert fist_angles[f] == pytest.approx(90.0)
+    assert open_angles[Finger.THUMB] > 150 > fist_angles[Finger.THUMB]
+
+
 def test_open_hand():
     p = pose()
     assert all(p.fingers.values())

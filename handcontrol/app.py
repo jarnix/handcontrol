@@ -160,7 +160,7 @@ class App:
                     log.debug("action: %s", action)
                     executor.execute(action)
                 if recorder is not None:
-                    recorder.record(scene, engine.states, actions)
+                    recorder.record(scene, engine.states, actions, raws)
                 if self.preview_enabled:
                     preview.draw(frame, raws, scene, engine.states)
                 elif preview.is_open:

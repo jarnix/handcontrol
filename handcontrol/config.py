@@ -31,7 +31,12 @@ class TrackerSettings:
 
 @dataclass(frozen=True)
 class HandSettings:
-    finger_extended_angle_deg: float = 150.0
+    # A finger counts as extended when its 3-D bend angle is at least this (180 = straight) ...
+    finger_extended_angle_deg: float = 130.0
+    # ... or, for a hand that is not foreshortened, when the image distance wrist->tip exceeds
+    # wrist->PIP by this factor. Measured on live recordings 2026-09-22: open hands 1.3-1.45,
+    # relaxed hands 0.6-0.9, fists 0.65-0.8; bend angles open 138-160, relaxed 80-112, fist 45-75.
+    finger_extended_ratio: float = 1.2
     fingers_joined_max_m: float = 0.03
     vertical_max_deg: float = 35.0      # a hand within this angle of straight up/down is "pointing"
     min_direction_len: float = 0.6      # wrist->knuckle length in hand widths; shorter = foreshortened, ignored
@@ -69,6 +74,7 @@ class VolumeSettings:
 
     engage_frames: int = 10
     repeat_frames: int = 5
+    release_frames: int = 3         # dropped/misread frames tolerated while active before stopping
 
 
 ALL_GESTURES: tuple[str, ...] = ("start_menu", "scroll", "youtube", "show_desktop", "volume_up", "volume_down")

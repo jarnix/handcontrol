@@ -57,6 +57,8 @@ class RawHand:
 @dataclass(frozen=True)
 class HandPose:
     fingers: Mapping[Finger, bool]
+    finger_angles: Mapping[Finger, float]   # degrees at the bending joint, 180 = straight (diagnostics/tuning)
+    finger_ratios: Mapping[Finger, float]   # image distance wrist->tip over wrist->PIP; > 1 = tip beyond the knuckle
     hand_width: float          # image-space index MCP <-> pinky MCP; the unit for motion thresholds
     palm_center: Point2        # image space
     two_finger_point: Point2   # midpoint of index and middle tips, image space
@@ -132,9 +134,27 @@ def angle_deg(a: Point3, b: Point3, c: Point3) -> float:
     return math.degrees(math.acos(max(-1.0, min(1.0, cos))))
 
 
-def finger_extended(world: list[Point3], finger: Finger, min_angle_deg: float) -> bool:
+def finger_angle(world: list[Point3], finger: Finger) -> float:
     root, joint, tip = FINGER_JOINTS[finger]
-    return angle_deg(world[root], world[joint], world[tip]) >= min_angle_deg
+    return angle_deg(world[root], world[joint], world[tip])
+
+
+def finger_ratio(landmarks: list[Point3], finger: Finger) -> float:
+    """Image-space wrist->tip distance divided by wrist->PIP (thumb: wrist->IP)."""
+    _, joint, tip = FINGER_JOINTS[finger]
+    wrist = landmarks[WRIST][:2]
+    to_joint = distance(wrist, landmarks[joint][:2])
+    return distance(wrist, landmarks[tip][:2]) / to_joint if to_joint > 0 else 0.0
+
+
+def extended_by_rule(angle: float, ratio: float, direction_len: float, settings: HandSettings) -> bool:
+    """A finger is extended when its 3-D bend angle is straight enough, or, for a hand that is
+    not foreshortened, when its tip lies clearly beyond the knuckle in the image. The 2-D
+    ratio is the more reliable signal on a webcam (world-landmark depth is noisy) but means
+    nothing when the fingers point at the camera, hence the direction_len gate."""
+    if angle >= settings.finger_extended_angle_deg:
+        return True
+    return direction_len >= settings.min_direction_len and ratio >= settings.finger_extended_ratio
 
 
 def hand_width(landmarks: list[Point3]) -> float:
@@ -171,12 +191,16 @@ def pointing(direction_deg: float, direction_len: float, settings: HandSettings)
 
 
 def pose_from_raw(raw: RawHand, t: float, settings: HandSettings) -> HandPose:
-    fingers = {f: finger_extended(raw.world, f, settings.finger_extended_angle_deg) for f in Finger}
-    index_tip, middle_tip = raw.landmarks[INDEX_TIP], raw.landmarks[MIDDLE_TIP]
     width = hand_width(raw.landmarks)
     deg, length = direction(raw.landmarks, width)
+    angles = {f: finger_angle(raw.world, f) for f in Finger}
+    ratios = {f: finger_ratio(raw.landmarks, f) for f in Finger}
+    fingers = {f: extended_by_rule(angles[f], ratios[f], length, settings) for f in Finger}
+    index_tip, middle_tip = raw.landmarks[INDEX_TIP], raw.landmarks[MIDDLE_TIP]
     return HandPose(
         fingers=fingers,
+        finger_angles=angles,
+        finger_ratios=ratios,
         hand_width=width,
         palm_center=palm_center(raw.landmarks),
         two_finger_point=((index_tip[0] + middle_tip[0]) / 2, (index_tip[1] + middle_tip[1]) / 2),

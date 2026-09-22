@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Sequence
 
 from handcontrol.actions import Action
-from handcontrol.hand import HandPose, Scene
+from handcontrol.hand import HandPose, RawHand, Scene
 
 
 def pose_name(pose: HandPose) -> str:
@@ -27,6 +27,8 @@ def pose_name(pose: HandPose) -> str:
 def hand_record(pose: HandPose) -> dict:
     return {
         "fingers": {f.value: on for f, on in pose.fingers.items()},
+        "angles": {f.value: round(a, 1) for f, a in pose.finger_angles.items()},
+        "ratios": {f.value: round(r, 2) for f, r in pose.finger_ratios.items()},
         "pose": pose_name(pose),
         "pointing": pose.pointing,
         "direction_deg": round(pose.direction_deg, 1),
@@ -42,12 +44,21 @@ class Recorder:
         path.parent.mkdir(parents=True, exist_ok=True)
         self._file = path.open("w", encoding="utf-8")
 
-    def record(self, scene: Scene, states: dict[str, str], actions: Sequence[Action]) -> None:
+    def record(self, scene: Scene, states: dict[str, str], actions: Sequence[Action], raws: Sequence[RawHand] = ()) -> None:
         line = {
             "t": round(scene.t, 4),
             "hands": [hand_record(p) for p in scene.hands],
             "states": dict(states),
             "actions": [repr(a) for a in actions],
+            "raw": [
+                {
+                    "landmarks": [[round(v, 4) for v in p] for p in r.landmarks],
+                    "world": [[round(v, 4) for v in p] for p in r.world],
+                    "handedness": r.handedness,
+                    "score": round(r.score, 3),
+                }
+                for r in raws
+            ],
         }
         self._file.write(json.dumps(line) + "\n")
 

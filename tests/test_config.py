@@ -5,14 +5,15 @@ def test_defaults_match_spec():
     s = Settings()
     assert (s.camera.index, s.camera.width, s.camera.height) == (0, 1280, 720)
     assert s.tracker.min_hand_detection_confidence == 0.5
-    assert s.hand.finger_extended_angle_deg == 150.0
+    assert s.hand.finger_extended_angle_deg == 130.0
+    assert s.hand.finger_extended_ratio == 1.2
     assert s.hand.fingers_joined_max_m == 0.03
     assert s.hand.vertical_max_deg == 35.0
     assert s.hand.min_direction_len == 0.6
     assert (s.start_menu.fist_frames, s.start_menu.open_within_frames, s.start_menu.cooldown_s) == (6, 12, 1.5)
     assert (s.youtube.hold_frames, s.youtube.cooldown_s, s.youtube.url) == (18, 2.0, "https://www.youtube.com")
     assert (s.show_desktop.hold_frames, s.show_desktop.cooldown_s) == (18, 1.5)
-    assert (s.volume.engage_frames, s.volume.repeat_frames) == (10, 5)
+    assert (s.volume.engage_frames, s.volume.repeat_frames, s.volume.release_frames) == (10, 5, 3)
     assert s.scroll.engage_frames == 3
     assert s.scroll.release_frames == 5
     assert s.scroll.deadzone_widths == 0.02

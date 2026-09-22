@@ -61,7 +61,9 @@ class Preview:
         lines = [f"{self._fps:4.1f} fps  hands={len(scene.hands)}"]
         for i, pose in enumerate(scene.hands):
             flags = " ".join(f.value[:2] + ("+" if on else "-") for f, on in pose.fingers.items())
+            angles = " ".join(f"{f.value[:2]}{a:3.0f}" for f, a in pose.finger_angles.items())
             lines.append(f"hand{i} {flags}  pose={pose_name(pose)} joined={pose.two_fingers_joined}")
+            lines.append(f"      angles {angles}")
             lines.append(f"      width={pose.hand_width:.3f} dir={pose.direction_deg:+.0f} len={pose.direction_len:.2f} pointing={pose.pointing}")
         if not scene.hands:
             lines.append("no hand")

@@ -14,7 +14,7 @@
 
 ## Global Constraints
 
-- Same as the v1.0 plan: pure modules never import cv2/mediapipe/pystray/ctypes; tests need no camera; every threshold comes from `Settings` with the defaults of spec §6; `uv run pytest -q` green at the end of every task; commit per task with the `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` trailer; create files with the Write tool (the Bash tool breaks on apostrophes).
+- Same as the v1.0 plan: pure modules never import cv2/mediapipe/pystray/ctypes; tests need no camera; every threshold comes from `Settings` with the defaults of spec §6; `uv run pytest -q` green at the end of every task; commit per task with a plain message (no attribution trailers); create files with the Write tool (the Bash tool breaks on apostrophes).
 - Motion unit is `HandPose.hand_width` everywhere. `palm_size` is removed.
 - `Gesture.update(scene, t)`; nothing receives a bare pose any more.
 

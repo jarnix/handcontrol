@@ -22,7 +22,7 @@
 - Scroll direction is natural: fingers move up → wheel delta negative (content moves up); fingers move down → positive.
 - Every threshold comes from `Settings`; defaults are exactly the values in spec §6.
 - Run tests with `uv run pytest -q`. Every task ends with all tests passing.
-- Commit after every task. Every commit message ends with the trailer line `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` (pass it as a second `-m`).
+- Commit after every task. Plain commit messages, no attribution trailers of any kind.
 - The Bash tool on this machine breaks on apostrophes inside heredocs. Create files with the Write tool, not shell heredocs.
 
 ---
@@ -155,7 +155,7 @@ Expected: prints `1.0.1` (MediaPipe log lines on stderr are fine).
 
 ```bash
 git add pyproject.toml uv.lock .gitignore handcontrol/__init__.py handcontrol/__main__.py
-git commit -m "chore: scaffold uv project with mediapipe, opencv, pystray" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "chore: scaffold uv project with mediapipe, opencv, pystray"
 ```
 
 ---
@@ -363,7 +363,7 @@ Expected: `7 passed`.
 
 ```bash
 git add handcontrol/config.py tests/test_config.py
-git commit -m "feat: settings dataclasses with TOML override" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "feat: settings dataclasses with TOML override"
 ```
 
 ---
@@ -711,7 +711,7 @@ Expected: `13 passed`.
 
 ```bash
 git add handcontrol/hand.py tests/handbuilder.py tests/test_hand.py
-git commit -m "feat: hand pose geometry from MediaPipe landmarks" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "feat: hand pose geometry from MediaPipe landmarks"
 ```
 
 ---
@@ -898,7 +898,7 @@ Expected: `4 passed`.
 
 ```bash
 git add handcontrol/actions.py handcontrol/gestures/__init__.py handcontrol/gestures/base.py tests/test_gesture_engine.py
-git commit -m "feat: action types and gesture engine with mutual exclusion" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "feat: action types and gesture engine with mutual exclusion"
 ```
 
 ---
@@ -1073,7 +1073,7 @@ Expected: `8 passed`.
 
 ```bash
 git add handcontrol/gestures/start_menu.py tests/test_start_menu.py
-git commit -m "feat: start-menu open-palm swipe gesture" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "feat: start-menu open-palm swipe gesture"
 ```
 
 ---
@@ -1311,7 +1311,7 @@ Expected: all tests pass (7 + 13 + 4 + 8 + 11 = 43).
 
 ```bash
 git add handcontrol/gestures/two_finger_scroll.py tests/test_two_finger_scroll.py
-git commit -m "feat: two-finger natural scroll gesture" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "feat: two-finger natural scroll gesture"
 ```
 
 ---
@@ -1596,7 +1596,7 @@ Expected: the Start menu opens after 2 s. Press Escape to close it.
 
 ```bash
 git add handcontrol/winput.py handcontrol/actions.py tests/test_actions.py
-git commit -m "feat: Windows input injection and action executor" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "feat: Windows input injection and action executor"
 ```
 
 ---
@@ -1880,7 +1880,7 @@ Expected: the model downloads on first run to `%LOCALAPPDATA%\HandControl\models
 
 ```bash
 git add handcontrol/model.py handcontrol/camera.py handcontrol/tracker.py tests/test_model.py
-git commit -m "feat: camera capture, MediaPipe hand tracker and model download" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "feat: camera capture, MediaPipe hand tracker and model download"
 ```
 
 ---
@@ -1983,7 +1983,7 @@ Expected: all tests pass.
 
 ```bash
 git add handcontrol/preview.py
-git commit -m "feat: debug preview window" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "feat: debug preview window"
 ```
 
 ---
@@ -2155,7 +2155,7 @@ Expected: a red disc with a hand glyph appears in the tray; hovering shows `Hand
 
 ```bash
 git add handcontrol/tray.py tests/test_tray.py
-git commit -m "feat: system tray icon and menu" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "feat: system tray icon and menu"
 ```
 
 ---
@@ -2452,7 +2452,7 @@ Expected: green tray icon with tooltip `HandControl - running`; Show preview ope
 
 ```bash
 git add handcontrol/app.py handcontrol/__main__.py tests/test_main.py
-git commit -m "feat: app lifecycle, pipeline thread and CLI" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "feat: app lifecycle, pipeline thread and CLI"
 ```
 
 ---
@@ -2577,7 +2577,7 @@ If Step 5 changed any default, put the tuned numbers in this table too.
 
 ```bash
 git add README.md handcontrol/config.py tests/test_config.py docs/superpowers/specs/2026-09-22-handcontrol-design.md
-git commit -m "docs: README, tuned gesture defaults" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "docs: README, tuned gesture defaults"
 ```
 
 ---

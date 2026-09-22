@@ -9,7 +9,12 @@ def test_defaults():
 
 
 def test_all_flags():
-    a = parse_args(["--preview", "--no-tray", "--camera", "2", "--config", "c.toml", "-v"])
+    a = parse_args(["--preview", "--no-tray", "--camera", "2", "--config", "c.toml", "--record", "s.jsonl", "-v"])
     assert a.preview and a.no_tray and a.verbose
     assert a.camera == 2
     assert a.config == Path("c.toml")
+    assert a.record == Path("s.jsonl")
+
+
+def test_record_defaults_to_none():
+    assert parse_args([]).record is None

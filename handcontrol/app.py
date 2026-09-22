@@ -15,6 +15,7 @@ from handcontrol.gestures.base import GestureEngine
 from handcontrol.hand import make_scene, pose_from_raw
 from handcontrol.model import ensure_model
 from handcontrol.preview import Preview
+from handcontrol.recorder import Recorder
 from handcontrol.tracker import HandTracker
 from handcontrol.tray import State, Tray
 
@@ -24,10 +25,19 @@ CAMERA_RETRY_S = 3.0
 
 
 class App:
-    def __init__(self, settings: Settings, model_path: Path, *, preview: bool = False, use_tray: bool = True) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        model_path: Path,
+        *,
+        preview: bool = False,
+        use_tray: bool = True,
+        record_path: Path | None = None,
+    ) -> None:
         self.settings = settings
         self.model_path = model_path
         self.preview_enabled = preview
+        self.record_path = record_path
         self._stop = threading.Event()
         self._quit = threading.Event()
         self._thread: threading.Thread | None = None
@@ -124,6 +134,10 @@ class App:
 
         executor = ActionExecutor(winput, wheel_step=s.scroll.wheel_step)
         preview = Preview()
+        recorder = Recorder(self.record_path) if self.record_path is not None else None
+        if recorder is not None:
+            log.info("recording every frame to %s", self.record_path)
+        log.info("gestures enabled: %s", ", ".join(engine.states) or "none")
         t0 = time.monotonic()
         try:
             while not self._stop.is_set():
@@ -141,14 +155,19 @@ class App:
                     log.exception("hand tracking failed on a frame")
                     continue
                 scene = make_scene((pose_from_raw(raw, now, s.hand) for raw in raws), now)
-                for action in engine.update(scene, now):
+                actions = engine.update(scene, now)
+                for action in actions:
                     log.debug("action: %s", action)
                     executor.execute(action)
+                if recorder is not None:
+                    recorder.record(scene, engine.states, actions)
                 if self.preview_enabled:
                     preview.draw(frame, raws, scene, engine.states)
                 elif preview.is_open:
                     preview.close()
         finally:
+            if recorder is not None:
+                recorder.close()
             preview.close()
             tracker.close()
             camera.release()

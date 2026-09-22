@@ -23,6 +23,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--config", type=Path, default=None, metavar="PATH",
         help="TOML config file (default: %%LOCALAPPDATA%%\\HandControl\\config.toml)",
     )
+    parser.add_argument(
+        "--record", type=Path, default=None, metavar="PATH",
+        help="write what the pipeline sees every frame to this JSON Lines file (for tuning gestures)",
+    )
     parser.add_argument("-v", "--verbose", action="store_true", help="debug logging")
     parser.add_argument("--version", action="version", version=f"handcontrol {__version__}")
     return parser.parse_args(argv)
@@ -57,6 +61,7 @@ def main(argv: list[str] | None = None) -> int:
         model_path=app_data_dir() / "models" / "hand_landmarker.task",
         preview=args.preview,
         use_tray=not args.no_tray,
+        record_path=args.record,
     )
     try:
         app.run()

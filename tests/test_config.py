@@ -19,6 +19,13 @@ def test_defaults_match_spec():
     assert s.scroll.gain_notches_per_width == 3.0
     assert s.scroll.smoothing == 0.5
     assert s.scroll.wheel_step == 120
+    assert s.gestures.enabled == ("volume_up", "volume_down")
+
+
+def test_gestures_enabled_list_from_toml(tmp_path):
+    p = tmp_path / "config.toml"
+    p.write_text("[gestures]\nenabled = [\"scroll\", \"volume_up\"]\n", encoding="utf-8")
+    assert tuple(load_settings(p).gestures.enabled) == ("scroll", "volume_up")
 
 
 def test_partial_override_keeps_other_defaults():

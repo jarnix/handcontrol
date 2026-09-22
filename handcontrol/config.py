@@ -71,6 +71,16 @@ class VolumeSettings:
     repeat_frames: int = 5
 
 
+ALL_GESTURES: tuple[str, ...] = ("start_menu", "scroll", "youtube", "show_desktop", "volume_up", "volume_down")
+
+
+@dataclass(frozen=True)
+class GesturesSettings:
+    """Which gestures run. Bring-up is step by step: only volume is on until each gesture is tuned."""
+
+    enabled: tuple[str, ...] = ("volume_up", "volume_down")
+
+
 @dataclass(frozen=True)
 class ScrollSettings:
     engage_frames: int = 3
@@ -91,6 +101,7 @@ class Settings:
     show_desktop: ShowDesktopSettings = field(default_factory=ShowDesktopSettings)
     volume: VolumeSettings = field(default_factory=VolumeSettings)
     scroll: ScrollSettings = field(default_factory=ScrollSettings)
+    gestures: GesturesSettings = field(default_factory=GesturesSettings)
 
 
 def app_data_dir() -> Path:

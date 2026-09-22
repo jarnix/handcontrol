@@ -1,13 +1,14 @@
 from handbuilder import build_hand
 
 from handcontrol.actions import OPEN_START_MENU, SHOW_DESKTOP, VOLUME_DOWN, VOLUME_UP, OpenUrl
-from handcontrol.config import HandSettings, Settings, YoutubeSettings
+from handcontrol.config import ALL_GESTURES, GesturesSettings, HandSettings, Settings, YoutubeSettings
 from handcontrol.gestures import build_gestures
 from handcontrol.gestures.base import GestureEngine
 from handcontrol.hand import Finger, make_scene, pose_from_raw
 
 H = HandSettings()
 FPS = 30.0
+EVERYTHING = GesturesSettings(enabled=ALL_GESTURES)
 
 
 def pose(**kwargs):
@@ -23,7 +24,7 @@ def feed(engine, poses_per_frame, t0=0.0):
 
 
 def test_registry_order_and_actions():
-    gestures = build_gestures(Settings(youtube=YoutubeSettings(url="https://example.com")))
+    gestures = build_gestures(Settings(youtube=YoutubeSettings(url="https://example.com"), gestures=EVERYTHING))
     assert [g.name for g in gestures] == ["start_menu", "scroll", "youtube", "show_desktop", "volume_up", "volume_down"]
     by_name = {g.name: g for g in gestures}
     assert by_name["start_menu"].action == OPEN_START_MENU
@@ -33,8 +34,22 @@ def test_registry_order_and_actions():
     assert by_name["volume_down"].action == VOLUME_DOWN
 
 
+def test_only_enabled_gestures_are_built_in_priority_order():
+    names = [g.name for g in build_gestures(Settings(gestures=GesturesSettings(enabled=("volume_down", "scroll"))))]
+    assert names == ["scroll", "volume_down"]
+
+
+def test_unknown_gesture_names_are_ignored():
+    names = [g.name for g in build_gestures(Settings(gestures=GesturesSettings(enabled=("bogus", "volume_up"))))]
+    assert names == ["volume_up"]
+
+
+def test_default_is_volume_only_for_now():
+    assert [g.name for g in build_gestures(Settings())] == ["volume_up", "volume_down"]
+
+
 def test_end_to_end_bomb_opens_the_start_menu_once_and_silences_volume_while_the_hand_stays_open():
-    s = Settings()
+    s = Settings(gestures=EVERYTHING)
     engine = GestureEngine(build_gestures(s))
     closed, opened = pose(extended=set()), pose()
     bomb = [[closed]] * s.start_menu.fist_frames + [[opened]] * 3
@@ -47,7 +62,7 @@ def test_end_to_end_bomb_opens_the_start_menu_once_and_silences_volume_while_the
 
 
 def test_end_to_end_rock_on_opens_youtube_once():
-    s = Settings()
+    s = Settings(gestures=EVERYTHING)
     engine = GestureEngine(build_gestures(s))
     rock = pose(extended={Finger.INDEX, Finger.PINKY})
     assert feed(engine, [[rock]] * (s.youtube.hold_frames + 10)) == [OpenUrl(s.youtube.url)]

@@ -1,11 +1,10 @@
 from handbuilder import build_hand
 
 from handcontrol.config import HandSettings
-from handcontrol.gestures.poses import clap, middle_finger, rock_on, volume_down, volume_up
+from handcontrol.gestures.poses import fist, middle_finger, open_hand, rock_on, volume_down, volume_up
 from handcontrol.hand import Finger, make_scene, pose_from_raw
 
 H = HandSettings()
-WIDTH = 0.06 * 1.25  # builder knuckle width at the default scale
 
 ROCK = {Finger.INDEX, Finger.PINKY}
 MIDDLE = {Finger.MIDDLE}
@@ -19,38 +18,14 @@ def scene(*poses):
     return make_scene(poses, 0.0)
 
 
-def side_by_side(widths_apart, second=None, **both):
-    """Two hands in the same orientation, the second one ``widths_apart`` hand widths to the right."""
-    second = {**both, **(second or {})}
-    return scene(pose(center=(0.4, 0.5), **both), pose(center=(0.4 + widths_apart * WIDTH, 0.5), **second))
-
-
-def test_clap_two_open_hands_close_together():
-    assert clap(1.2)(side_by_side(0.5))
-
-
-def test_clap_rejects_hands_far_apart():
-    assert not clap(1.2)(side_by_side(3.0))
-
-
-def test_clap_threshold_is_configurable():
-    assert not clap(1.2)(side_by_side(2.0))
-    assert clap(2.5)(side_by_side(2.0))
-
-
-def test_clap_rejects_a_closed_hand():
-    assert not clap(1.2)(side_by_side(0.5, second={"extended": set()}))
-    assert not clap(1.2)(side_by_side(0.5, second={"extended": {Finger.INDEX, Finger.MIDDLE}}))
-
-
-def test_clap_works_in_any_orientation():
-    assert clap(1.2)(side_by_side(0.5, direction="camera"))
-    assert clap(1.2)(side_by_side(0.5, direction="down"))
-
-
-def test_clap_needs_two_hands():
-    assert not clap(1.2)(scene(pose()))
-    assert not clap(1.2)(scene())
+def test_fist_and_open_hand_use_the_larger_hand_in_any_orientation():
+    for direction in ("up", "down", "camera", "side"):
+        assert fist(scene(pose(extended=set(), direction=direction)))
+        assert open_hand(scene(pose(direction=direction)))
+    assert fist(scene(pose(extended=set(), scale=2.0), pose(scale=1.0)))          # fist is primary
+    assert not fist(scene(pose(extended=set(), scale=1.0), pose(scale=2.0)))      # open hand is primary
+    assert open_hand(scene(pose(scale=2.0), pose(extended=set(), scale=1.0)))
+    assert not open_hand(scene(pose(extended=set())))
 
 
 def test_rock_on_uses_the_larger_hand():
@@ -86,4 +61,4 @@ def test_volume_down_mirrors_volume_up():
 
 def test_empty_scene_matches_nothing():
     empty = scene()
-    assert not any(p(empty) for p in (clap(1.2), rock_on, middle_finger, volume_up, volume_down))
+    assert not any(p(empty) for p in (fist, open_hand, rock_on, middle_finger, volume_up, volume_down))

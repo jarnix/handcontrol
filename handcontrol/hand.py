@@ -75,6 +75,10 @@ class HandPose:
         return self._only(Finger.INDEX, Finger.MIDDLE, Finger.RING, Finger.PINKY)
 
     @property
+    def is_fist(self) -> bool:
+        return self._only()
+
+    @property
     def is_two_finger(self) -> bool:
         return self._only(Finger.INDEX, Finger.MIDDLE) and self.two_fingers_joined
 

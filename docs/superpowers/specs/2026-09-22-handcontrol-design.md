@@ -11,13 +11,15 @@ Windows input. Version 1.1 ships five gestures:
 
 | Gesture | Pose | Fires | Effect |
 |---|---|---|---|
-| Clap sign | Two open hands, palm centres within 1.2 hand-widths, any orientation | Held 8 frames (~0.3 s) | Windows key (toggles the Start menu) |
+| Bomb | A fist held 6 frames (~0.2 s), then opened into a flat hand within 12 frames (~0.4 s), any orientation | On reaching the open hand | Windows key (toggles the Start menu) |
 | Rock-on | Index + pinky extended, middle + ring curled | Held 18 frames (~0.6 s) | Opens YouTube in the default browser |
 | Volume | One open hand pointing up = louder, pointing down = quieter | After 10 frames, then one step every 5 frames while held | Media volume keys, 2% per step |
 | Middle finger | Middle extended, index/ring/pinky curled | Held 18 frames | Win+D: show desktop (again restores the windows) |
 | Two-finger scroll | Index and middle extended and touching, ring and pinky curled, moved up or down | While held | Mouse-wheel scroll in the focused app, natural direction (fingers up → content moves up) |
 
 Held gestures must be released before they can fire again, and have a cooldown.
+The bomb replaced a two-hand clap sign (v1.1 first draft): palms brought
+together are edge-on to the camera and MediaPipe rarely sees both hands.
 
 Non-goals for v1.1: start-with-Windows, packaged `.exe`, settings window,
 GPU inference, click/cursor control, telling palm-up from palm-down.
@@ -119,13 +121,19 @@ Action = TapKeys(vks: tuple[int, ...]) | Scroll(notches: int) | OpenUrl(url: str
 
 `Gesture` protocol: `update(scene: Scene, t: float) -> list[Action]`, `engaged: bool`, `state: str`, `reset()`.
 
-`GestureEngine` runs gestures in priority order. If one is `engaged`, every other gesture is `reset()` and skipped for that frame. Order: clap, scroll, rock-on, middle finger, volume up, volume down.
+`GestureEngine` runs gestures in priority order. If one is `engaged`, every other gesture is `reset()` and skipped for that frame. Order: bomb, scroll, rock-on, middle finger, volume up, volume down.
 
 **Which hand a gesture looks at**
 
-- Clap uses `scene.pair`.
-- Scroll, rock-on and middle finger use `scene.primary` (the larger hand), so a resting second hand does not block them.
-- Volume uses `scene.single`: two open hands coming together for a clap must not nudge the volume on the way in.
+- Bomb, scroll, rock-on and middle finger use `scene.primary` (the larger hand), so a resting second hand does not block them.
+- Volume uses `scene.single`, so a second visible hand never changes the volume by accident.
+
+**TransitionGesture(name, start, end, action, min_start_frames, max_transition_frames, cooldown_s)** (the bomb)
+
+- `IDLE` counts consecutive frames of the start pose (fist); after `min_start_frames` → `ARMED`.
+- `ARMED`: the end pose (open hand) fires `action` and enters `RELEASE`; the start pose keeps it armed; any other pose is tolerated for up to `max_transition_frames` consecutive frames (the fingers in motion), after which it drops to `IDLE`.
+- `RELEASE` lasts while the end pose is held, so the freshly opened hand cannot start the volume gesture; then `COOLDOWN` until `cooldown_s` after the fire, then `IDLE`. A new bomb needs a new fist.
+- `engaged` while `ARMED` or `RELEASE`.
 
 **HoldGesture(name, predicate, action, hold_frames, cooldown_s)**
 
@@ -141,8 +149,7 @@ Action = TapKeys(vks: tuple[int, ...]) | Scroll(notches: int) | OpenUrl(url: str
 
 **Predicates (`gestures/poses.py`)**
 
-- `clap(max_distance_widths)`: both hands of `scene.pair` are open hands and their palm centres are within `max_distance_widths × max(hand widths)`.
-- `rock_on`, `middle_finger`: `scene.primary` matches the pose.
+- `fist`, `open_hand`, `rock_on`, `middle_finger`: `scene.primary` matches the pose (`is_fist` = index to pinky all curled, thumb ignored).
 - `volume_up` / `volume_down`: `scene.single` is an open hand with `pointing` "up" / "down".
 
 **TwoFingerScroll** (unchanged logic, now on `scene.primary` and in hand-width units): engage after `engage_frames` (3) of the two-finger pose; per frame `dy = Δy / hand_width`, EMA smoothing, dead zone, `notches_acc += dy × gain_notches_per_width` (3.0), emit whole notches, keep the remainder; tolerate `release_frames` (5) of pose loss. Fingers down → positive notches → content moves down (natural direction).
@@ -220,9 +227,9 @@ fingers_joined_max_m = 0.03
 vertical_max_deg = 35
 min_direction_len = 0.6
 
-[start_menu]                # clap sign
-max_distance_widths = 1.2
-hold_frames = 8
+[start_menu]                # bomb: fist, then open hand
+fist_frames = 6
+open_within_frames = 12
 cooldown_s = 1.5
 
 [youtube]                   # rock-on
@@ -249,7 +256,7 @@ wheel_step = 120
 
 ## 7. Decisions taken on assumptions (override any of these)
 
-1. Clap detection needs MediaPipe to see both hands. Palms pressed flat together with fingers straight up are edge-on to the camera and often detect as one hand; fingers toward the screen or a small gap work better. The distance threshold is a setting.
+1. The bomb and the volume gesture share the open hand: after a bomb the hand must be closed or lowered before volume can engage, and raising a closed hand then opening it reads as a bomb rather than the start of a volume change. Both timings are settings.
 2. Palm-up is not distinguished from palm-down anywhere.
 3. Volume repeats while held, like holding a keyboard volume key.
 4. "Reduce all windows" is Win+D (show desktop), so the same gesture brings the windows back.

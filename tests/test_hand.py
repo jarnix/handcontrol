@@ -31,7 +31,14 @@ def test_open_hand():
 def test_fist():
     p = pose(extended=set())
     assert not any(p.fingers.values())
+    assert p.is_fist
     assert not (p.is_open_hand or p.is_two_finger or p.is_rock_on or p.is_middle_finger)
+
+
+def test_fist_ignores_the_thumb_and_needs_every_finger_curled():
+    assert pose(extended={Finger.THUMB}).is_fist
+    assert not pose(extended={Finger.INDEX}).is_fist
+    assert not pose().is_fist
 
 
 def test_two_finger_pose():

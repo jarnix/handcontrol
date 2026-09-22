@@ -9,7 +9,7 @@ def test_defaults_match_spec():
     assert s.hand.fingers_joined_max_m == 0.03
     assert s.hand.vertical_max_deg == 35.0
     assert s.hand.min_direction_len == 0.6
-    assert (s.start_menu.max_distance_widths, s.start_menu.hold_frames, s.start_menu.cooldown_s) == (1.2, 8, 1.5)
+    assert (s.start_menu.fist_frames, s.start_menu.open_within_frames, s.start_menu.cooldown_s) == (6, 12, 1.5)
     assert (s.youtube.hold_frames, s.youtube.cooldown_s, s.youtube.url) == (18, 2.0, "https://www.youtube.com")
     assert (s.show_desktop.hold_frames, s.show_desktop.cooldown_s) == (18, 1.5)
     assert (s.volume.engage_frames, s.volume.repeat_frames) == (10, 5)

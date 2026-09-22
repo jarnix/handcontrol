@@ -39,10 +39,10 @@ class HandSettings:
 
 @dataclass(frozen=True)
 class StartMenuSettings:
-    """Clap sign: two open hands close together."""
+    """Bomb: a fist held briefly, then opened into a flat hand."""
 
-    max_distance_widths: float = 1.2
-    hold_frames: int = 8
+    fist_frames: int = 6            # frames the fist must be held before the opening counts
+    open_within_frames: int = 12    # frames allowed between leaving the fist and reaching the open hand
     cooldown_s: float = 1.5
 
 

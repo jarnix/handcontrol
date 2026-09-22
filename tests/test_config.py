@@ -7,21 +7,26 @@ def test_defaults_match_spec():
     assert s.tracker.min_hand_detection_confidence == 0.5
     assert s.hand.finger_extended_angle_deg == 150.0
     assert s.hand.fingers_joined_max_m == 0.03
-    assert (s.start_menu.swipe_distance_palms, s.start_menu.swipe_window_s, s.start_menu.swipe_cooldown_s) == (1.5, 0.5, 1.5)
+    assert s.hand.vertical_max_deg == 35.0
+    assert s.hand.min_direction_len == 0.6
+    assert (s.start_menu.max_distance_widths, s.start_menu.hold_frames, s.start_menu.cooldown_s) == (1.2, 8, 1.5)
+    assert (s.youtube.hold_frames, s.youtube.cooldown_s, s.youtube.url) == (18, 2.0, "https://www.youtube.com")
+    assert (s.show_desktop.hold_frames, s.show_desktop.cooldown_s) == (18, 1.5)
+    assert (s.volume.engage_frames, s.volume.repeat_frames) == (10, 5)
     assert s.scroll.engage_frames == 3
     assert s.scroll.release_frames == 5
-    assert s.scroll.deadzone_palms == 0.02
-    assert s.scroll.gain_notches_per_palm == 4.0
+    assert s.scroll.deadzone_widths == 0.02
+    assert s.scroll.gain_notches_per_width == 3.0
     assert s.scroll.smoothing == 0.5
     assert s.scroll.wheel_step == 120
 
 
 def test_partial_override_keeps_other_defaults():
-    s = settings_from_dict({"scroll": {"gain_notches_per_palm": 8.0}, "camera": {"index": 2}})
-    assert s.scroll.gain_notches_per_palm == 8.0
+    s = settings_from_dict({"scroll": {"gain_notches_per_width": 8.0}, "youtube": {"url": "https://example.com"}})
+    assert s.scroll.gain_notches_per_width == 8.0
     assert s.scroll.wheel_step == 120
-    assert s.camera.index == 2
-    assert s.camera.width == 1280
+    assert s.youtube.url == "https://example.com"
+    assert s.youtube.hold_frames == 18
 
 
 def test_unknown_keys_and_sections_are_ignored():
@@ -39,8 +44,10 @@ def test_missing_file_gives_defaults(tmp_path):
 
 def test_file_override(tmp_path):
     p = tmp_path / "config.toml"
-    p.write_text("[start_menu]\nswipe_cooldown_s = 3.0\n", encoding="utf-8")
-    assert load_settings(p).start_menu.swipe_cooldown_s == 3.0
+    p.write_text("[start_menu]\ncooldown_s = 3.0\n[volume]\nrepeat_frames = 2\n", encoding="utf-8")
+    s = load_settings(p)
+    assert s.start_menu.cooldown_s == 3.0
+    assert s.volume.repeat_frames == 2
 
 
 def test_malformed_file_falls_back_to_defaults(tmp_path):

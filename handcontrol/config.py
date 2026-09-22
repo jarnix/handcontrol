@@ -33,21 +33,50 @@ class TrackerSettings:
 class HandSettings:
     finger_extended_angle_deg: float = 150.0
     fingers_joined_max_m: float = 0.03
+    vertical_max_deg: float = 35.0      # a hand within this angle of straight up/down is "pointing"
+    min_direction_len: float = 0.6      # wrist->knuckle length in hand widths; shorter = foreshortened, ignored
 
 
 @dataclass(frozen=True)
 class StartMenuSettings:
-    swipe_distance_palms: float = 1.5
-    swipe_window_s: float = 0.5
-    swipe_cooldown_s: float = 1.5
+    """Clap sign: two open hands close together."""
+
+    max_distance_widths: float = 1.2
+    hold_frames: int = 8
+    cooldown_s: float = 1.5
+
+
+@dataclass(frozen=True)
+class YoutubeSettings:
+    """Rock-on held."""
+
+    hold_frames: int = 18
+    cooldown_s: float = 2.0
+    url: str = "https://www.youtube.com"
+
+
+@dataclass(frozen=True)
+class ShowDesktopSettings:
+    """Middle finger held."""
+
+    hold_frames: int = 18
+    cooldown_s: float = 1.5
+
+
+@dataclass(frozen=True)
+class VolumeSettings:
+    """Open hand pointing up or down, repeating while held."""
+
+    engage_frames: int = 10
+    repeat_frames: int = 5
 
 
 @dataclass(frozen=True)
 class ScrollSettings:
     engage_frames: int = 3
     release_frames: int = 5
-    deadzone_palms: float = 0.02
-    gain_notches_per_palm: float = 4.0
+    deadzone_widths: float = 0.02
+    gain_notches_per_width: float = 3.0
     smoothing: float = 0.5
     wheel_step: int = 120
 
@@ -58,6 +87,9 @@ class Settings:
     tracker: TrackerSettings = field(default_factory=TrackerSettings)
     hand: HandSettings = field(default_factory=HandSettings)
     start_menu: StartMenuSettings = field(default_factory=StartMenuSettings)
+    youtube: YoutubeSettings = field(default_factory=YoutubeSettings)
+    show_desktop: ShowDesktopSettings = field(default_factory=ShowDesktopSettings)
+    volume: VolumeSettings = field(default_factory=VolumeSettings)
     scroll: ScrollSettings = field(default_factory=ScrollSettings)
 
 

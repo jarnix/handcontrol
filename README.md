@@ -49,7 +49,8 @@ width = 1280
 height = 720
 
 [hand]
-finger_extended_angle_deg = 150   # straighter than this = extended
+finger_extended_angle_deg = 130   # 3-D bend at the knuckle straighter than this = extended ...
+finger_extended_ratio = 1.2       # ... or fingertip this much farther from the wrist than the knuckle (image)
 fingers_joined_max_m = 0.03       # index/middle tips closer than this = joined
 vertical_max_deg = 35             # within this angle of straight up/down = pointing up/down
 min_direction_len = 0.6           # shorter wrist-to-knuckle length = fingers toward the camera, ignored
@@ -71,6 +72,10 @@ cooldown_s = 1.5
 [volume]                          # open hand pointing up or down
 engage_frames = 10                # frames before the first step
 repeat_frames = 5                 # frames between steps while held
+release_frames = 3                # misread frames tolerated before the repeat stops
+
+[gestures]
+enabled = ["volume_up", "volume_down"]   # bring-up is step by step; add "start_menu", "scroll", "youtube", "show_desktop"
 
 [scroll]
 engage_frames = 3                 # frames the pose must hold before scrolling starts
@@ -82,6 +87,14 @@ wheel_step = 120                  # wheel units per notch; 120 is one standard c
 ```
 
 Use `--preview` to see finger flags, pointing direction and gesture states while tuning.
+
+## Tune
+
+`uv run handcontrol --preview --record C:\tmp\session.jsonl` logs what the pipeline sees
+every frame (finger flags, angles, ratios, pointing, gesture states, actions) as JSON Lines.
+`uv run python tools/record_poses.py C:\tmp\poses.jsonl` walks you through a set of poses
+with on-screen prompts, records raw landmarks under each label, saves snapshot images, and
+prints how the candidate finger classifiers score each pose.
 
 ## Develop
 

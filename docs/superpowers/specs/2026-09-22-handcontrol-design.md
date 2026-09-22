@@ -111,7 +111,7 @@ Action = TapKeys(vks: tuple[int, ...]) | Scroll(notches: int) | OpenUrl(url: str
 
 ### 3.3 Hand geometry (`hand.py`)
 
-- **Finger extended**: angle at the bending joint (MCP→PIP→TIP; thumb CMC→MCP→TIP) from world landmarks ≥ `finger_extended_angle_deg` (150°). Orientation- and distance-invariant.
+- **Finger extended**: the 3-D bend angle at the bending joint (MCP→PIP→TIP; thumb CMC→MCP→TIP) from world landmarks is ≥ `finger_extended_angle_deg` (130°), **or**, when the hand is not foreshortened (`direction_len ≥ min_direction_len`), the image-space wrist→tip distance is ≥ `finger_extended_ratio` (1.2) × wrist→PIP. Measured on live guided recordings (2026-09-22): open hands give bend 138–160° and ratio 1.3–1.45; relaxed hands 80–112° and 0.6–0.9; fists 45–75° and 0.65–0.8. The original 150° angle-only rule read real open hands as fists because webcam depth estimates bend the fingers.
 - **Fingers joined**: world distance index tip ↔ middle tip ≤ `fingers_joined_max_m` (0.03 m).
 - **Hand width** (image-space index MCP ↔ pinky MCP) is the unit for every motion threshold. Unlike wrist→knuckle length it does not collapse when the fingers point at the camera.
 - **Pointing**: `direction_deg` is measured from the image-space wrist→middle-MCP vector; `pointing` is "up"/"down" only when that vector is within `vertical_max_deg` (35°) of vertical and at least `min_direction_len` (0.6) hand-widths long, so a foreshortened hand is neither.
@@ -144,7 +144,8 @@ Action = TapKeys(vks: tuple[int, ...]) | Scroll(notches: int) | OpenUrl(url: str
 
 **RepeatGesture(name, predicate, action, engage_frames, repeat_frames)**
 
-- `IDLE` → `ACTIVE` after `engage_frames` consecutive true frames; emits `action` on entering `ACTIVE` and again every `repeat_frames` frames while the predicate stays true. A false frame → `IDLE`.
+- `IDLE` → `ACTIVE` after `engage_frames` consecutive true frames; emits `action` on entering `ACTIVE` and again every `repeat_frames` frames while the predicate stays true. Up to `release_frames` consecutive false frames are tolerated while active (the tracker drops the odd frame); more → `IDLE`.
+- Known limitation (measured 2026-09-22): MediaPipe cannot track an open hand with the fingers pointing down from a desk webcam; the skeleton it returns is unrelated to the hand. "Volume down = fingers down" therefore does not work and needs a different pose.
 - `engaged` while `ACTIVE`.
 
 **Predicates (`gestures/poses.py`)**
@@ -222,7 +223,8 @@ min_hand_presence_confidence = 0.5
 min_tracking_confidence = 0.5
 
 [hand]
-finger_extended_angle_deg = 150
+finger_extended_angle_deg = 130
+finger_extended_ratio = 1.2
 fingers_joined_max_m = 0.03
 vertical_max_deg = 35
 min_direction_len = 0.6
@@ -244,6 +246,10 @@ cooldown_s = 1.5
 [volume]                    # open hand pointing up / down
 engage_frames = 10
 repeat_frames = 5
+release_frames = 3
+
+[gestures]                  # bring-up is step by step
+enabled = ["volume_up", "volume_down"]
 
 [scroll]
 engage_frames = 3

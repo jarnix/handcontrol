@@ -1,215 +1,207 @@
 # HandControl — Design
 
 Date: 2026-09-22
-Status: approved 2026-09-22 (stack: Python)
+Status: v1.1 approved 2026-09-22 (stack: Python). v1.0 shipped an open-palm upward
+swipe for the Start menu; v1.1 replaces it with the gesture set below.
 
 ## 1. Goal
 
 A Windows system-tray app that watches the webcam and turns hand gestures into
-Windows input. Version 1 ships exactly two gestures:
+Windows input. Version 1.1 ships five gestures:
 
-| Gesture | Trigger | Effect |
-|---|---|---|
-| Start menu | One open hand, palm facing the camera, swept upward | Press the Windows key (toggles the Start menu) |
-| Two-finger scroll | Index and middle finger extended and touching, other fingers curled, moved up or down | Mouse-wheel scroll in the focused app, "natural" direction (fingers up → content moves up → wheel scrolls down) |
+| Gesture | Pose | Fires | Effect |
+|---|---|---|---|
+| Clap sign | Two open hands, palm centres within 1.2 hand-widths, any orientation | Held 8 frames (~0.3 s) | Windows key (toggles the Start menu) |
+| Rock-on | Index + pinky extended, middle + ring curled | Held 18 frames (~0.6 s) | Opens YouTube in the default browser |
+| Volume | One open hand pointing up = louder, pointing down = quieter | After 10 frames, then one step every 5 frames while held | Media volume keys, 2% per step |
+| Middle finger | Middle extended, index/ring/pinky curled | Held 18 frames | Win+D: show desktop (again restores the windows) |
+| Two-finger scroll | Index and middle extended and touching, ring and pinky curled, moved up or down | While held | Mouse-wheel scroll in the focused app, natural direction (fingers up → content moves up) |
 
-Non-goals for v1: start-with-Windows, packaged `.exe`, settings window,
-additional gestures, two-hand gestures, GPU inference, click/cursor control.
+Held gestures must be released before they can fire again, and have a cooldown.
+
+Non-goals for v1.1: start-with-Windows, packaged `.exe`, settings window,
+GPU inference, click/cursor control, telling palm-up from palm-down.
 
 ## 2. Stack
 
 - Python 3.13, project managed with `uv` (`pyproject.toml`, lock file).
-- `mediapipe` 1.0.1 — Tasks API `HandLandmarker`, `VIDEO` running mode (synchronous), CPU.
+- `mediapipe` 1.0.1 — Tasks API `HandLandmarker`, `VIDEO` running mode (synchronous), CPU, `num_hands = 2`.
 - `opencv-python` — webcam capture and the optional preview window.
 - `pystray` + `Pillow` — tray icon and menu.
-- `ctypes` (stdlib) — `SendInput` for the Windows key and wheel events; `GetForegroundWindow`, `GetCursorPos`, `SetCursorPos`. No third-party input library.
+- `ctypes` (stdlib) — `SendInput` for key taps/chords and wheel events; `GetForegroundWindow`, `GetCursorPos`, `SetCursorPos`. `webbrowser` (stdlib) for URLs.
 - `tomllib` (stdlib) — optional config file.
 - `pytest` — unit tests.
 
-Verified on this machine on 2026-09-22 in a throwaway venv: the mediapipe 1.0.1
-wheel installs and imports on Python 3.13.8; the Logitech StreamCam opens via
-`CAP_DSHOW` at 1920×1080 in 2.3 s; `detect_for_video` averages 19 ms per
-1080p frame on CPU.
+Verified on this machine on 2026-09-22: the mediapipe 1.0.1 wheel installs and
+imports on Python 3.13.8; the Logitech StreamCam opens via `CAP_DSHOW` (always
+1920×1080 whatever is requested, 60 fps capture, ~3.5 s to open);
+`detect_for_video` takes 17.7 ms per 1080p frame on CPU for one hand
+(resolution barely matters: 14.1 ms at 640×360). A second visible hand adds
+roughly the landmark-model cost again.
 
-Alternatives considered:
-
-- Electron + MediaPipe JS (WASM/WebGL). GPU inference and easy webcam access, but input injection needs a native Node module built against the Electron ABI, and the app is ~200 MB. More moving parts for no v1 benefit.
-- C#/.NET tray app. No official MediaPipe bindings; .NET is not installed here. Rejected.
+Alternatives considered: Electron + MediaPipe JS (native input module, 200 MB
+app) and C#/.NET (no official bindings). Rejected.
 
 ## 3. Architecture
 
 Two threads:
 
-- **Main thread** runs the pystray message loop (`icon.run()`).
-- **Pipeline thread** runs a ~30 Hz loop: capture → track → pose → gestures → actions → (preview). The preview window is drawn from this same thread because OpenCV HighGUI must be driven from one thread.
-
-There is no separate capture thread: `VideoCapture.read()` blocks for one frame
-period and paces the loop, and synchronous inference at 10–20 ms fits inside it.
+- **Main thread** runs the pystray message loop.
+- **Pipeline thread** runs a ~30 Hz loop: capture → track (up to two hands) → poses → scene → gestures → actions → (preview). The preview is drawn from this thread because OpenCV HighGUI must be driven from one thread.
 
 ### 3.1 Package layout
 
 ```
 handcontrol/
-  __main__.py            entry point: CLI args → App
-  app.py                 App: owns Settings, Tray, pipeline thread; start/stop/pause; model download
+  __main__.py            CLI: --preview, --no-tray, --camera N, --config PATH, -v; file log under pythonw
+  app.py                 App: lifecycle, tray callbacks, pipeline thread, builds the gesture list
   tray.py                pystray icon + menu (Enabled, Show preview, Quit); icon colour = state
-  camera.py              Camera: open/read/release with reconnect backoff
-  tracker.py             HandTracker: wraps HandLandmarker → list[RawHand]
-  hand.py                HandPose: pure geometry from RawHand (finger flags, palm facing, palm size, key points)
+  camera.py              Camera: lazy open, self-healing read, release
+  tracker.py             HandTracker: HandLandmarker VIDEO mode → list[RawHand]
+  model.py               ensure_model(): download hand_landmarker.task if missing
+  hand.py                RawHand, HandPose (pure geometry), Scene (0-2 poses)
   gestures/
     base.py              Gesture protocol + GestureEngine (priority + mutual exclusion)
-    start_menu.py        StartMenuSwipe state machine
+    poses.py             scene predicates: clap(), rock_on, middle_finger, volume_up, volume_down
+    hold.py              HoldGesture: predicate held N frames → one action, release + cooldown
+    repeat.py            RepeatGesture: predicate held → action on engage, then every N frames
     two_finger_scroll.py TwoFingerScroll state machine + wheel-notch accumulator
-  actions.py             Action types (OpenStartMenu, Scroll) + ActionExecutor
-  winput.py              thin ctypes wrappers over user32 (SendInput, foreground window, cursor)
-  config.py              Settings dataclass with defaults; optional TOML override
-  preview.py             debug overlay: landmarks, finger flags, gesture states, fps
-  model.py               ensure_model(): locate or download hand_landmarker.task
+  actions.py             TapKeys, Scroll, OpenUrl; InputBackend protocol; ActionExecutor
+  winput.py              ctypes user32 wrappers + webbrowser open_url
+  config.py              Settings dataclasses with defaults; optional TOML override
+  preview.py             debug overlay: landmarks of every hand, flags, pointing, gesture states
 tests/
-  handbuilder.py         build_hand(): synthetic RawHand for any finger combination
-  test_hand.py
-  test_gesture_engine.py
-  test_start_menu.py
-  test_two_finger_scroll.py
-  test_actions.py
-  test_model.py
-  test_tray.py
-  test_main.py
-  test_config.py
-docs/superpowers/specs/  this document
+  handbuilder.py         build_hand(): synthetic RawHand for any finger combination and direction
+  test_*.py              one per pure module
 ```
 
-`hand.py`, `gestures/*`, `actions.py` (types) and `config.py` are pure: no
-threads, no I/O, no MediaPipe import. They carry all the logic and all the
-tests. `camera.py`, `tracker.py`, `winput.py`, `tray.py`, `preview.py` are thin
-adapters tested manually through the preview window.
+`hand.py`, `gestures/*`, `config.py` and the action types are pure: no threads,
+no I/O, no MediaPipe import. They carry all the logic and all the tests.
 
 ### 3.2 Data types
 
 ```python
 RawHand(landmarks: list[Point3], world: list[Point3], handedness: str, score: float)
-    # 21 image landmarks, normalized 0..1 (y grows downward), z relative depth
-    # 21 world landmarks in metres, origin at the hand centre
 
 HandPose(
-    fingers: dict[Finger, bool],      # THUMB..PINKY -> extended?
-    palm_facing_camera: bool,
-    palm_size: float,                 # image-space distance wrist -> middle MCP
-    palm_center: (x, y),              # image space
-    two_finger_point: (x, y),         # midpoint of index & middle tips, image space
-    two_fingers_joined: bool,         # index tip <-> middle tip within a few cm (world space)
-    t: float,                         # monotonic seconds
+    fingers: Mapping[Finger, bool],   # THUMB..PINKY -> extended?
+    hand_width: float,                # image-space index MCP <-> pinky MCP; the unit for all motion thresholds
+    palm_center: Point2,              # image space
+    two_finger_point: Point2,         # midpoint of index & middle tips
+    two_fingers_joined: bool,         # world distance index tip <-> middle tip <= fingers_joined_max_m
+    direction_deg: float,             # image-space wrist -> middle MCP: 0 up, 90 right, 180 down, -90 left
+    direction_len: float,             # |wrist -> middle MCP| / hand_width; small = fingers toward the camera
+    pointing: "up" | "down" | None,   # direction within vertical_max_deg of up/down AND direction_len >= min_direction_len
+    t: float,
 )
+    is_open_hand      index, middle, ring, pinky extended (thumb ignored)
+    is_two_finger     index + middle extended and joined, ring + pinky curled
+    is_rock_on        index + pinky extended, middle + ring curled
+    is_middle_finger  middle extended, index + ring + pinky curled
 
-Action = OpenStartMenu() | Scroll(notches: int)
+Scene(hands: tuple[HandPose, ...], t: float)   # sorted by hand_width, largest first
+    primary   hands[0] or None
+    single    hands[0] only when exactly one hand is visible, else None
+    pair      (hands[0], hands[1]) when two are visible, else None
+
+Action = TapKeys(vks: tuple[int, ...]) | Scroll(notches: int) | OpenUrl(url: str)
 ```
 
 ### 3.3 Hand geometry (`hand.py`)
 
-- **Finger extended**: angle at the PIP joint (MCP→PIP→TIP) computed from world landmarks is ≥ `finger_extended_angle_deg` (default 150°). Thumb uses MCP→IP→TIP. World landmarks make this independent of camera angle and distance.
-- **Fingers joined**: world distance between index tip and middle tip ≤ `fingers_joined_max_m` (default 0.03 m).
-- **Palm facing camera**: sign of the z-component of `(index_mcp − wrist) × (pinky_mcp − wrist)` on image landmarks, combined with handedness. Measured on MediaPipe's sample photos (2026-09-22): a hand labelled "Right" with its palm visible has the thumb on the image right, so the cross product is negative; a "Left" palm is positive; the back of a hand flips the sign. This is the opposite of what the docs' "labels assume a mirrored image" remark suggests, so the code comment records the measurement and the preview window is used to confirm it live.
-- **Palm size** is the normalizer: all motion thresholds are expressed in "palm units" so the same physical movement gives the same result at any distance from the camera.
-- **Open palm** = index, middle, ring and pinky extended and palm facing camera. The thumb is computed and shown in the preview but not required: a relaxed open hand often has a slightly bent thumb, and requiring it would make the gesture flaky.
-- **Two-finger pose** = index and middle extended and joined; ring and pinky curled; thumb ignored.
+- **Finger extended**: angle at the bending joint (MCP→PIP→TIP; thumb CMC→MCP→TIP) from world landmarks ≥ `finger_extended_angle_deg` (150°). Orientation- and distance-invariant.
+- **Fingers joined**: world distance index tip ↔ middle tip ≤ `fingers_joined_max_m` (0.03 m).
+- **Hand width** (image-space index MCP ↔ pinky MCP) is the unit for every motion threshold. Unlike wrist→knuckle length it does not collapse when the fingers point at the camera.
+- **Pointing**: `direction_deg` is measured from the image-space wrist→middle-MCP vector; `pointing` is "up"/"down" only when that vector is within `vertical_max_deg` (35°) of vertical and at least `min_direction_len` (0.6) hand-widths long, so a foreshortened hand is neither.
+- Palm-facing-camera detection was removed in v1.1: it depends on the handedness label whose convention proved orientation-dependent, and no gesture needs it.
 
 ### 3.4 Gestures
 
-`Gesture` protocol: `update(pose: HandPose | None, t: float) -> list[Action]`,
-`engaged: bool`, `state: str`, `reset()`.
+`Gesture` protocol: `update(scene: Scene, t: float) -> list[Action]`, `engaged: bool`, `state: str`, `reset()`.
 
-`GestureEngine` holds gestures in priority order `[TwoFingerScroll, StartMenuSwipe]`.
-Each frame it passes the pose to every gesture. If one gesture is `engaged`, every
-other gesture is `reset()` and receives `None` for that frame, so a scroll in
-progress can never fire the Start menu and vice versa. Only one hand is tracked
-(`num_hands = 1`), so "which hand" never has to be arbitrated.
+`GestureEngine` runs gestures in priority order. If one is `engaged`, every other gesture is `reset()` and skipped for that frame. Order: clap, scroll, rock-on, middle finger, volume up, volume down.
 
-**StartMenuSwipe**
+**Which hand a gesture looks at**
 
-- `IDLE` → `ARMED` when an open palm is seen. While `ARMED`, keep a deque of `(t, y)` samples of the palm centre over the last `swipe_window_s` (0.5 s).
-- Fire when `max(y in window) − y_now ≥ swipe_distance_palms × palm_size` (default 1.5 palms), i.e. the hand rose by 1.5 palm heights within half a second. Emit `OpenStartMenu`, enter `COOLDOWN` for `swipe_cooldown_s` (1.5 s).
-- Any frame without an open palm → `IDLE` (deque cleared). Cooldown ends → `IDLE`.
-- `engaged` is true only while `ARMED`. The scroll pose is not an open palm, so a resting open hand never blocks scrolling for long.
+- Clap uses `scene.pair`.
+- Scroll, rock-on and middle finger use `scene.primary` (the larger hand), so a resting second hand does not block them.
+- Volume uses `scene.single`: two open hands coming together for a clap must not nudge the volume on the way in.
 
-**TwoFingerScroll**
+**HoldGesture(name, predicate, action, hold_frames, cooldown_s)**
 
-- `IDLE` → `TRACKING` after the two-finger pose has been held for `scroll_engage_frames` (3) consecutive frames. Entering `TRACKING` records the previous `two_finger_point`.
-- Each `TRACKING` frame: `dy = (y_now − y_prev) / palm_size` (positive = fingers moved down in the image). Apply EMA smoothing (`scroll_smoothing` 0.5) and a dead zone (`scroll_deadzone_palms` 0.02). `notches_acc += dy × scroll_gain` (default 4 notches per palm height). Whenever `|notches_acc| ≥ 1`, emit `Scroll(int(notches_acc))` and keep the remainder. Sign: fingers down → positive notches → content moves down, which is wheel "up" in Windows terms. Fingers up → negative → wheel down. This is the natural / Apple direction.
-- Pose lost for up to `scroll_release_frames` (5 frames ≈ 170 ms) is tolerated (landmark flicker); longer → `IDLE`, accumulator cleared.
-- `engaged` is true while `TRACKING`.
+- `IDLE` → `HOLDING` while the predicate is true; a false frame drops back to `IDLE` (count restarts).
+- After `hold_frames` consecutive true frames: emit `action`, enter `RELEASE`.
+- `RELEASE` waits for a false frame (the pose must be let go), then `COOLDOWN` until `cooldown_s` after firing, then `IDLE`.
+- `engaged` while `HOLDING` or `RELEASE`.
+
+**RepeatGesture(name, predicate, action, engage_frames, repeat_frames)**
+
+- `IDLE` → `ACTIVE` after `engage_frames` consecutive true frames; emits `action` on entering `ACTIVE` and again every `repeat_frames` frames while the predicate stays true. A false frame → `IDLE`.
+- `engaged` while `ACTIVE`.
+
+**Predicates (`gestures/poses.py`)**
+
+- `clap(max_distance_widths)`: both hands of `scene.pair` are open hands and their palm centres are within `max_distance_widths × max(hand widths)`.
+- `rock_on`, `middle_finger`: `scene.primary` matches the pose.
+- `volume_up` / `volume_down`: `scene.single` is an open hand with `pointing` "up" / "down".
+
+**TwoFingerScroll** (unchanged logic, now on `scene.primary` and in hand-width units): engage after `engage_frames` (3) of the two-finger pose; per frame `dy = Δy / hand_width`, EMA smoothing, dead zone, `notches_acc += dy × gain_notches_per_width` (3.0), emit whole notches, keep the remainder; tolerate `release_frames` (5) of pose loss. Fingers down → positive notches → content moves down (natural direction).
 
 ### 3.5 Actions (`actions.py`, `winput.py`)
 
-- `OpenStartMenu` → `SendInput` key down + key up for `VK_LWIN`.
-- `Scroll(n)` → first ensure the cursor is over the foreground window: if `GetCursorPos()` is outside `GetWindowRect(GetForegroundWindow())`, `SetCursorPos` to the window centre. Then `SendInput` `MOUSEEVENTF_WHEEL` with `mouseData = n × wheel_step` (default 120, one notch). Windows delivers the wheel to the window under the cursor, so this is what makes "the focused app" receive it.
-- `SendInput` returning 0 is logged as a warning, never raised.
+- `TapKeys(vks)` → one `SendInput` call: key-down for each key in order, key-up in reverse. Constants: `OPEN_START_MENU = TapKeys((VK_LWIN,))`, `SHOW_DESKTOP = TapKeys((VK_LWIN, VK_D))`, `VOLUME_UP = TapKeys((VK_VOLUME_UP,))`, `VOLUME_DOWN = TapKeys((VK_VOLUME_DOWN,))`.
+- `Scroll(n)` → park the cursor inside the foreground window if it is elsewhere (Windows routes wheel events to the window under the cursor), then `MOUSEEVENTF_WHEEL` with `n × wheel_step`.
+- `OpenUrl(url)` → `webbrowser.open(url)` (default browser, new tab).
+- `SendInput` returning fewer events than sent is logged, never raised.
 
-### 3.6 Tray (`tray.py`) and app lifecycle (`app.py`)
+### 3.6 Tray, lifecycle, config
 
-Menu: **Enabled** (checkbox), **Show preview** (checkbox), **Quit**.
+Unchanged from v1.0: menu Enabled / Show preview / Quit; Disabled releases the
+webcam; icon green/grey/red with a tooltip; model downloaded on first run to
+`%LOCALAPPDATA%\HandControl\models\`; config at `%LOCALAPPDATA%\HandControl\config.toml`;
+`handcontrol` (console) and `handcontrol-gui` (pythonw, rotating file log) entry points.
 
-- Disabled = pipeline thread stopped and camera released (webcam LED off). Enabled = pipeline started.
-- Icon is drawn with Pillow: a simple hand glyph on a coloured disc. Green = running, grey = disabled, red = error. Tooltip carries the state text ("HandControl — running", "Camera unavailable", …).
-- On start, `App` resolves the model at `%LOCALAPPDATA%\HandControl\models\hand_landmarker.task` and downloads it from the official Google storage URL if missing (tray notification "Downloading model…"). Failure → red icon, Quit still works.
-- Config is read from `%LOCALAPPDATA%\HandControl\config.toml` if present; only listed keys override defaults. `--config PATH` overrides the location.
-- Entry points: `handcontrol` (console script; logs to stdout; flags `--preview`, `--no-tray`, `--camera N`, `--config PATH`, `-v`) and `handcontrol-gui` (GUI script that runs under `pythonw`, no console; logs to `%LOCALAPPDATA%\HandControl\handcontrol.log`, rotating).
-
-### 3.7 Pipeline loop (pipeline thread)
+### 3.7 Pipeline loop
 
 ```
 while running:
-    frame = camera.read()                      # BGR, 1280x720
-    if frame is None:
-        engine.reset(); tray.error("Camera unavailable"); wait 3 s; continue   # camera reopens itself on the next read
-    raw = tracker.detect(frame, t_ms)          # 0 or 1 hands
-    pose = HandPose.from_raw(raw[0], t) if raw else None
-    for action in engine.update(pose, t):
-        executor.execute(action)
-    if preview_enabled:
-        preview.draw(frame, pose, engine); cv2.waitKey(1)
+    frame = camera.read()
+    if frame is None: engine.reset(); tray.error("camera unavailable"); wait 3 s; continue
+    raws = tracker.detect(frame, t_ms)                     # 0..2 hands
+    scene = Scene(sorted(pose_from_raw(r, t, hand_settings) for r in raws, by hand_width desc), t)
+    for action in engine.update(scene, t): executor.execute(action)
+    if preview_enabled: preview.draw(frame, raws, scene, engine.states)
 ```
-
-Camera default 1280×720 (MediaPipe resizes internally; this keeps colour
-conversion cheap and startup fast). Camera frames are processed un-mirrored;
-only the preview is flipped for display. Timestamps are monotonic milliseconds
-and strictly increasing, as `VIDEO` mode requires.
 
 ## 4. Error handling
 
 | Failure | Behaviour |
 |---|---|
-| No camera / camera unplugged | Red icon + tooltip; retry every 3 s; no crash; gestures reset |
-| Model file missing | Download on first run with a tray notification; failure → red icon with message |
-| Inference raises | Log, skip the frame, keep running |
-| `SendInput` fails | Log warning |
-| Hand lost mid-gesture | Gesture resets after the tolerance window; no stray actions |
-| Config file malformed | Log the TOML error, run with defaults |
+| No camera / camera unplugged | Red icon + tooltip; retry every 3 s; gestures reset |
+| Model file missing | Download on first run with a tray notification; failure → red icon |
+| Inference raises | Log, skip the frame |
+| `SendInput` short count | Log warning |
+| Browser cannot be opened | Log warning |
+| Hand lost mid-gesture | Hold/repeat gestures drop to IDLE; scroll tolerates 5 frames |
+| Config file malformed | Log, run with defaults |
 
 ## 5. Testing
 
-Unit tests (`pytest`, no camera, no MediaPipe import):
+Unit tests (`pytest`, no camera, no MediaPipe): hand geometry and pose flags for
+every gesture pose in four directions (up, down, toward camera, sideways);
+`Scene` ordering and `primary`/`single`/`pair`; each predicate including the
+two-hand distance rule and the single-hand rule for volume; `HoldGesture`
+(fires once, restart on drop-out, release required, cooldown); `RepeatGesture`
+(engage, cadence, release); scroll direction, accumulator, dead zone, flicker
+tolerance; engine mutual exclusion; executor mapping for every action; config
+defaults and overrides.
 
-- `test_hand.py`: synthetic landmark fixtures for open palm, two-finger, fist, and a "victory" (spread) pose → expected finger flags, joined flag, palm facing flag, palm size.
-- `test_gestures.py`: scripted `(pose, t)` sequences →
-  - fast upward open-palm sweep fires exactly once, then cooldown suppresses a second one;
-  - slow upward drift over 2 s does not fire;
-  - open palm moving sideways or downward does not fire;
-  - two-finger pose held then moved up by N palms emits negative notches with the expected total; moved down emits positive;
-  - movement below the dead zone emits nothing;
-  - one-frame landmark flicker during scroll does not drop `TRACKING`;
-  - accumulator carries the fractional remainder across frames;
-  - engine: while scroll is engaged, an open-palm sweep does not fire.
-- `test_config.py`: defaults; partial TOML override; malformed TOML falls back.
+Manual acceptance with `handcontrol --preview`: each of the five gestures works
+from a natural position; a resting second hand does not block scroll; two hands
+approaching for a clap do not change the volume; one minute of typing and
+ordinary movement causes no false trigger; `handcontrol-gui` runs silently.
 
-Manual acceptance (with `handcontrol --preview`):
-
-1. Tray icon appears; Enabled toggle turns the webcam LED on/off; Quit exits cleanly.
-2. Open-palm upward swipe opens the Start menu; a second swipe closes it; waving sideways does nothing.
-3. Two-finger up/down scrolls in Chrome, Explorer and Notepad with the natural direction; scroll goes to the focused window even if the mouse was elsewhere.
-4. Typing and normal hand movement for a minute cause no false triggers.
-5. Thresholds are tuned from the preview readout and written back as the defaults.
-
-## 6. Default settings (starting values, tuned during implementation)
+## 6. Default settings
 
 ```toml
 [camera]
@@ -225,27 +217,42 @@ min_tracking_confidence = 0.5
 [hand]
 finger_extended_angle_deg = 150
 fingers_joined_max_m = 0.03
+vertical_max_deg = 35
+min_direction_len = 0.6
 
-[start_menu]
-swipe_distance_palms = 1.5
-swipe_window_s = 0.5
-swipe_cooldown_s = 1.5
+[start_menu]                # clap sign
+max_distance_widths = 1.2
+hold_frames = 8
+cooldown_s = 1.5
+
+[youtube]                   # rock-on
+hold_frames = 18
+cooldown_s = 2.0
+url = "https://www.youtube.com"
+
+[show_desktop]              # middle finger
+hold_frames = 18
+cooldown_s = 1.5
+
+[volume]                    # open hand pointing up / down
+engage_frames = 10
+repeat_frames = 5
 
 [scroll]
 engage_frames = 3
 release_frames = 5
-deadzone_palms = 0.02
-gain_notches_per_palm = 4.0
+deadzone_widths = 0.02
+gain_notches_per_width = 3.0
 smoothing = 0.5
 wheel_step = 120
 ```
 
 ## 7. Decisions taken on assumptions (override any of these)
 
-1. Python over Electron, for the reasons in section 2.
-2. "Palm up" is read as the palm facing the camera with the hand held upright, not the palm facing the ceiling. A ceiling-facing palm is foreshortened and unreliable from a desk webcam.
-3. The Start-menu gesture presses the Windows key, so it toggles the menu rather than only opening it.
-4. Scroll targets the focused window; if the cursor is not over it, the cursor is moved to its centre first.
-5. Either hand works; only one hand is tracked at a time.
-6. "Disabled" in the tray fully releases the webcam.
-7. Startup-with-Windows and a packaged `.exe` are deferred; the app is run with `uv run handcontrol-gui` or a shortcut to it.
+1. Clap detection needs MediaPipe to see both hands. Palms pressed flat together with fingers straight up are edge-on to the camera and often detect as one hand; fingers toward the screen or a small gap work better. The distance threshold is a setting.
+2. Palm-up is not distinguished from palm-down anywhere.
+3. Volume repeats while held, like holding a keyboard volume key.
+4. "Reduce all windows" is Win+D (show desktop), so the same gesture brings the windows back.
+5. Rock-on opens a new YouTube tab each time; the hold-and-release rule and a 2 s cooldown prevent bursts.
+6. Either hand works for single-hand gestures; the larger hand in view is used, except volume which needs exactly one hand visible.
+7. Startup-with-Windows and a packaged `.exe` are deferred.

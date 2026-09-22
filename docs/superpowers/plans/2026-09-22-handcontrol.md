@@ -1,5 +1,7 @@
 # HandControl Implementation Plan
 
+> **Superseded in part (2026-09-22):** the Start-menu swipe gesture (Tasks 5 and 12 steps 1-3) was replaced by the v1.1 gesture set. See `2026-09-22-handcontrol-gestures-v1.1.md` and spec v1.1.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A Windows tray app that watches the webcam with MediaPipe and turns two hand gestures into input: an open-palm upward swipe presses the Windows key, and a two-finger vertical drag scrolls the focused app in the natural direction.

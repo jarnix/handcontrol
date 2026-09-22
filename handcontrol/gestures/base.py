@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Protocol, Sequence
 
 from handcontrol.actions import Action
-from handcontrol.hand import HandPose
+from handcontrol.hand import Scene
 
 
 class Gesture(Protocol):
@@ -15,26 +15,26 @@ class Gesture(Protocol):
     @property
     def engaged(self) -> bool: ...
 
-    def update(self, pose: HandPose | None, t: float) -> list[Action]: ...
+    def update(self, scene: Scene, t: float) -> list[Action]: ...
 
     def reset(self) -> None: ...
 
 
 class GestureEngine:
-    """Runs gestures in priority order. An engaged gesture owns the hand: every
+    """Runs gestures in priority order. An engaged gesture owns the scene: every
     other gesture is reset and skipped until it lets go."""
 
     def __init__(self, gestures: Sequence[Gesture]) -> None:
         self.gestures = list(gestures)
 
-    def update(self, pose: HandPose | None, t: float) -> list[Action]:
+    def update(self, scene: Scene, t: float) -> list[Action]:
         owner = next((g for g in self.gestures if g.engaged), None)
         actions: list[Action] = []
         for gesture in self.gestures:
             if owner is not None and gesture is not owner:
                 gesture.reset()
                 continue
-            actions.extend(gesture.update(pose, t))
+            actions.extend(gesture.update(scene, t))
             if owner is None and gesture.engaged:
                 owner = gesture
         return actions

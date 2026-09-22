@@ -1,4 +1,17 @@
-from handcontrol.actions import VK_LWIN, ActionExecutor, OpenStartMenu, Scroll
+from handcontrol.actions import (
+    OPEN_START_MENU,
+    SHOW_DESKTOP,
+    VK_D,
+    VK_LWIN,
+    VK_VOLUME_DOWN,
+    VK_VOLUME_UP,
+    VOLUME_DOWN,
+    VOLUME_UP,
+    ActionExecutor,
+    OpenUrl,
+    Scroll,
+    TapKeys,
+)
 
 
 class FakeBackend:
@@ -7,8 +20,8 @@ class FakeBackend:
         self.rect = rect
         self.calls = []
 
-    def tap_key(self, vk):
-        self.calls.append(("tap_key", vk))
+    def tap_keys(self, vks):
+        self.calls.append(("tap_keys", tuple(vks)))
 
     def scroll_wheel(self, delta):
         self.calls.append(("scroll_wheel", delta))
@@ -23,12 +36,28 @@ class FakeBackend:
     def foreground_window_rect(self):
         return self.rect
 
+    def open_url(self, url):
+        self.calls.append(("open_url", url))
 
-def test_start_menu_taps_the_windows_key():
+
+def test_key_constants():
+    assert (VK_LWIN, VK_D, VK_VOLUME_UP, VK_VOLUME_DOWN) == (0x5B, 0x44, 0xAF, 0xAE)
+    assert OPEN_START_MENU == TapKeys((VK_LWIN,))
+    assert SHOW_DESKTOP == TapKeys((VK_LWIN, VK_D))
+    assert VOLUME_UP == TapKeys((VK_VOLUME_UP,))
+    assert VOLUME_DOWN == TapKeys((VK_VOLUME_DOWN,))
+
+
+def test_tap_keys_passes_the_chord_through():
     b = FakeBackend()
-    ActionExecutor(b).execute(OpenStartMenu())
-    assert b.calls == [("tap_key", VK_LWIN)]
-    assert VK_LWIN == 0x5B
+    ActionExecutor(b).execute(SHOW_DESKTOP)
+    assert b.calls == [("tap_keys", (VK_LWIN, VK_D))]
+
+
+def test_open_url_goes_to_the_backend():
+    b = FakeBackend()
+    ActionExecutor(b).execute(OpenUrl("https://www.youtube.com"))
+    assert b.calls == [("open_url", "https://www.youtube.com")]
 
 
 def test_scroll_inside_foreground_window_only_sends_wheel():

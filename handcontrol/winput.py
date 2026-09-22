@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ctypes
 import logging
+import webbrowser
 from ctypes import wintypes
 
 log = logging.getLogger(__name__)
@@ -72,14 +73,33 @@ def _send(*inputs: INPUT) -> None:
         log.warning("SendInput delivered %d of %d events (error %d)", sent, len(inputs), ctypes.get_last_error())
 
 
+def tap_keys(vks: tuple[int, ...]) -> None:
+    """Press the keys in order and release them in reverse, as one input batch (chord-safe)."""
+    events = []
+    for vk in vks:
+        down = INPUT(type=INPUT_KEYBOARD)
+        down.ki.wVk = vk
+        events.append(down)
+    for vk in reversed(vks):
+        up = INPUT(type=INPUT_KEYBOARD)
+        up.ki.wVk = vk
+        up.ki.dwFlags = KEYEVENTF_KEYUP
+        events.append(up)
+    _send(*events)
+
+
 def tap_key(vk: int) -> None:
-    """Press and release a virtual key."""
-    down = INPUT(type=INPUT_KEYBOARD)
-    down.ki.wVk = vk
-    up = INPUT(type=INPUT_KEYBOARD)
-    up.ki.wVk = vk
-    up.ki.dwFlags = KEYEVENTF_KEYUP
-    _send(down, up)
+    """Press and release a single virtual key."""
+    tap_keys((vk,))
+
+
+def open_url(url: str) -> None:
+    """Open a URL in the default browser; failures are logged, never raised."""
+    try:
+        if not webbrowser.open(url):
+            log.warning("no browser could be opened for %s", url)
+    except Exception:
+        log.warning("opening %s failed", url, exc_info=True)
 
 
 def scroll_wheel(delta: int) -> None:

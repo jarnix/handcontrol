@@ -10,8 +10,10 @@ log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class OpenStartMenu:
-    """Press and release the Windows key."""
+class TapKeys:
+    """Press the keys in order and release them in reverse (a single key or a chord)."""
+
+    vks: tuple[int, ...]
 
 
 @dataclass(frozen=True)
@@ -21,13 +23,29 @@ class Scroll:
     notches: int
 
 
-Action = OpenStartMenu | Scroll
+@dataclass(frozen=True)
+class OpenUrl:
+    """Open a URL in the default browser."""
 
-VK_LWIN = 0x5B  # left Windows key virtual-key code
+    url: str
+
+
+Action = TapKeys | Scroll | OpenUrl
+
+# Windows virtual-key codes
+VK_LWIN = 0x5B
+VK_D = 0x44
+VK_VOLUME_UP = 0xAF
+VK_VOLUME_DOWN = 0xAE
+
+OPEN_START_MENU = TapKeys((VK_LWIN,))
+SHOW_DESKTOP = TapKeys((VK_LWIN, VK_D))
+VOLUME_UP = TapKeys((VK_VOLUME_UP,))
+VOLUME_DOWN = TapKeys((VK_VOLUME_DOWN,))
 
 
 class InputBackend(Protocol):
-    def tap_key(self, vk: int) -> None: ...
+    def tap_keys(self, vks: tuple[int, ...]) -> None: ...
 
     def scroll_wheel(self, delta: int) -> None: ...
 
@@ -36,6 +54,8 @@ class InputBackend(Protocol):
     def set_cursor_pos(self, x: int, y: int) -> None: ...
 
     def foreground_window_rect(self) -> tuple[int, int, int, int] | None: ...
+
+    def open_url(self, url: str) -> None: ...
 
 
 class ActionExecutor:
@@ -47,11 +67,13 @@ class ActionExecutor:
 
     def execute(self, action: Action) -> None:
         match action:
-            case OpenStartMenu():
-                self.backend.tap_key(VK_LWIN)
+            case TapKeys(vks):
+                self.backend.tap_keys(vks)
             case Scroll(notches):
                 self._ensure_cursor_in_foreground_window()
                 self.backend.scroll_wheel(notches * self.wheel_step)
+            case OpenUrl(url):
+                self.backend.open_url(url)
             case _:
                 log.warning("unknown action %r", action)
 

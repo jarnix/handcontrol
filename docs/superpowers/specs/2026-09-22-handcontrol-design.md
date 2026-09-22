@@ -64,10 +64,17 @@ handcontrol/
   winput.py              thin ctypes wrappers over user32 (SendInput, foreground window, cursor)
   config.py              Settings dataclass with defaults; optional TOML override
   preview.py             debug overlay: landmarks, finger flags, gesture states, fps
+  model.py               ensure_model(): locate or download hand_landmarker.task
 tests/
-  fixtures/              synthetic landmark sets (open palm, two-finger, fist)
+  handbuilder.py         build_hand(): synthetic RawHand for any finger combination
   test_hand.py
-  test_gestures.py
+  test_gesture_engine.py
+  test_start_menu.py
+  test_two_finger_scroll.py
+  test_actions.py
+  test_model.py
+  test_tray.py
+  test_main.py
   test_config.py
 docs/superpowers/specs/  this document
 ```
@@ -103,7 +110,7 @@ Action = OpenStartMenu() | Scroll(notches: int)
 - **Fingers joined**: world distance between index tip and middle tip ≤ `fingers_joined_max_m` (default 0.03 m).
 - **Palm facing camera**: sign of the z-component of `(index_mcp − wrist) × (pinky_mcp − wrist)` on image landmarks, combined with handedness. The sign convention is fixed during implementation by checking real frames in the preview window, and the rule is written down in a code comment.
 - **Palm size** is the normalizer: all motion thresholds are expressed in "palm units" so the same physical movement gives the same result at any distance from the camera.
-- **Open palm** = all five fingers extended and palm facing camera.
+- **Open palm** = index, middle, ring and pinky extended and palm facing camera. The thumb is computed and shown in the preview but not required: a relaxed open hand often has a slightly bent thumb, and requiring it would make the gesture flaky.
 - **Two-finger pose** = index and middle extended and joined; ring and pinky curled; thumb ignored.
 
 ### 3.4 Gestures
@@ -153,7 +160,7 @@ Menu: **Enabled** (checkbox), **Show preview** (checkbox), **Quit**.
 while running:
     frame = camera.read()                      # BGR, 1280x720
     if frame is None:
-        tracker.reset(); engine.reset(); tray.error("Camera unavailable"); camera.reconnect(); continue
+        engine.reset(); tray.error("Camera unavailable"); wait 3 s; continue   # camera reopens itself on the next read
     raw = tracker.detect(frame, t_ms)          # 0 or 1 hands
     pose = HandPose.from_raw(raw[0], t) if raw else None
     for action in engine.update(pose, t):

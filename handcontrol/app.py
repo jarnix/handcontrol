@@ -10,10 +10,9 @@ from pathlib import Path
 from handcontrol.actions import ActionExecutor
 from handcontrol.camera import Camera
 from handcontrol.config import Settings
+from handcontrol.gestures import build_gestures
 from handcontrol.gestures.base import GestureEngine
-from handcontrol.gestures.start_menu import StartMenuSwipe
-from handcontrol.gestures.two_finger_scroll import TwoFingerScroll
-from handcontrol.hand import pose_from_raw
+from handcontrol.hand import make_scene, pose_from_raw
 from handcontrol.model import ensure_model
 from handcontrol.preview import Preview
 from handcontrol.tracker import HandTracker
@@ -119,8 +118,8 @@ class App:
     def _loop(self) -> None:
         s = self.settings
         camera = Camera(s.camera.index, s.camera.width, s.camera.height)
-        tracker = HandTracker(self.model_path, s.tracker)
-        engine = GestureEngine([TwoFingerScroll(s.scroll), StartMenuSwipe(s.start_menu)])
+        tracker = HandTracker(self.model_path, s.tracker, num_hands=2)
+        engine = GestureEngine(build_gestures(s))
         from handcontrol import winput  # Windows-only module; imported here so tests never touch it
 
         executor = ActionExecutor(winput, wheel_step=s.scroll.wheel_step)
@@ -137,17 +136,16 @@ class App:
                 self._set_state("running", "running")
                 now = time.monotonic()
                 try:
-                    hands = tracker.detect(frame, int((now - t0) * 1000))
+                    raws = tracker.detect(frame, int((now - t0) * 1000))
                 except Exception:
                     log.exception("hand tracking failed on a frame")
                     continue
-                raw = hands[0] if hands else None
-                pose = pose_from_raw(raw, now, s.hand) if raw is not None else None
-                for action in engine.update(pose, now):
+                scene = make_scene((pose_from_raw(raw, now, s.hand) for raw in raws), now)
+                for action in engine.update(scene, now):
                     log.debug("action: %s", action)
                     executor.execute(action)
                 if self.preview_enabled:
-                    preview.draw(frame, raw, pose, engine.states)
+                    preview.draw(frame, raws, scene, engine.states)
                 elif preview.is_open:
                     preview.close()
         finally:

@@ -14,7 +14,7 @@ from handcontrol.hand import RawHand
 
 
 class HandTracker:
-    def __init__(self, model_path: Path, settings: TrackerSettings, num_hands: int = 1) -> None:
+    def __init__(self, model_path: Path, settings: TrackerSettings, num_hands: int = 2) -> None:
         options = vision.HandLandmarkerOptions(
             base_options=BaseOptions(model_asset_path=str(model_path)),
             running_mode=vision.RunningMode.VIDEO,

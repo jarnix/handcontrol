@@ -5,10 +5,12 @@ image, so the hand points "up" along -y and a curled finger folds toward +z.
 Image landmarks are the world layout scaled by 1.25 around ``center``, so the
 palm size (wrist -> middle MCP, 0.08 m) comes out at exactly 0.1 image units.
 
-Handedness and mirroring: MediaPipe labels hands as seen in a selfie mirror,
-where a "Right" hand with its palm toward the camera has the thumb on the
-image LEFT. The builder puts the thumb at negative x and mirrors x whenever
-the requested label/facing combination calls for it.
+Handedness and mirroring: as measured on MediaPipe's sample photos (see
+handcontrol.hand.palm_facing_camera), a hand labelled "Right" with its palm
+toward the camera has the thumb on the image RIGHT, and a "Left" palm has it
+on the image LEFT. The base layout below puts the thumb at negative x (a
+"Left" palm); x is mirrored whenever the requested label/facing combination
+needs the thumb on the other side.
 """
 
 from __future__ import annotations
@@ -59,7 +61,7 @@ def build_hand(
         world[pip] = _step(base, proximal, 0.03)
         world[dip] = _step(world[pip], distal, 0.025)
         world[tip] = _step(world[pip], distal, 0.05)
-    mirror = (handedness == "Right") != facing
+    mirror = (handedness == "Right") == facing
     sx = -1.25 if mirror else 1.25
     landmarks = [(center[0] + x * sx, center[1] + y * 1.25, z) for x, y, z in world]
     return RawHand(landmarks=landmarks, world=world, handedness=handedness, score=0.99)

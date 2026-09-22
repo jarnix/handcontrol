@@ -106,19 +106,20 @@ def palm_facing_camera(landmarks: list[Point3], handedness: str) -> bool:
     """True when the palm, not the back of the hand, faces the camera.
 
     Uses the 2-D cross product of wrist->index_mcp and wrist->pinky_mcp in
-    image space (y down). MediaPipe labels hands as seen in a selfie mirror:
-    a "Right" hand with the palm toward the camera shows its thumb on the
-    image LEFT, so index_mcp sits left of pinky_mcp and the cross product is
-    positive. The back of the hand flips the sign, and a "Left" hand flips it
-    again. The rule holds whether or not the frame is actually mirrored,
-    because the label flips together with the image. Confirmed on real frames
-    in the preview window (plan Task 12).
+    image space (y down). The sign convention was measured on MediaPipe's own
+    sample photos (gesture_recognizer/victory.jpg and pointing_up.jpg, both
+    palms toward the camera): a hand labelled "Right" with its palm visible
+    has the thumb on the image RIGHT, so index_mcp sits right of pinky_mcp and
+    the cross product is negative; a "Left" palm mirrors that. The back of a
+    hand flips the sign. Note this is the opposite of what the MediaPipe docs'
+    "labels assume a mirrored image" remark suggests; the measurement wins,
+    and it is re-checked live in the preview window (plan Task 12).
     """
     w, i, p = landmarks[WRIST], landmarks[INDEX_MCP], landmarks[PINKY_MCP]
     ux, uy = i[0] - w[0], i[1] - w[1]
     vx, vy = p[0] - w[0], p[1] - w[1]
     z = ux * vy - uy * vx
-    return z > 0 if handedness == "Right" else z < 0
+    return z < 0 if handedness == "Right" else z > 0
 
 
 def palm_size(landmarks: list[Point3]) -> float:

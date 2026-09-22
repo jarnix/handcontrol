@@ -108,7 +108,7 @@ Action = OpenStartMenu() | Scroll(notches: int)
 
 - **Finger extended**: angle at the PIP joint (MCP→PIP→TIP) computed from world landmarks is ≥ `finger_extended_angle_deg` (default 150°). Thumb uses MCP→IP→TIP. World landmarks make this independent of camera angle and distance.
 - **Fingers joined**: world distance between index tip and middle tip ≤ `fingers_joined_max_m` (default 0.03 m).
-- **Palm facing camera**: sign of the z-component of `(index_mcp − wrist) × (pinky_mcp − wrist)` on image landmarks, combined with handedness. The sign convention is fixed during implementation by checking real frames in the preview window, and the rule is written down in a code comment.
+- **Palm facing camera**: sign of the z-component of `(index_mcp − wrist) × (pinky_mcp − wrist)` on image landmarks, combined with handedness. Measured on MediaPipe's sample photos (2026-09-22): a hand labelled "Right" with its palm visible has the thumb on the image right, so the cross product is negative; a "Left" palm is positive; the back of a hand flips the sign. This is the opposite of what the docs' "labels assume a mirrored image" remark suggests, so the code comment records the measurement and the preview window is used to confirm it live.
 - **Palm size** is the normalizer: all motion thresholds are expressed in "palm units" so the same physical movement gives the same result at any distance from the camera.
 - **Open palm** = index, middle, ring and pinky extended and palm facing camera. The thumb is computed and shown in the preview but not required: a relaxed open hand often has a slightly bent thumb, and requiring it would make the gesture flaky.
 - **Two-finger pose** = index and middle extended and joined; ring and pinky curled; thumb ignored.

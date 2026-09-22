@@ -1,5 +1,7 @@
 # HandControl v1.1 Gestures Implementation Plan
 
+> **Update (2026-09-22, after live testing):** the clap sign was replaced by a "bomb" (fist held ~0.2 s, then opened into a flat hand) implemented as a generic `TransitionGesture` in `handcontrol/gestures/transition.py`; `clap()` and its settings are gone. The spec is the source of truth for the current gesture set.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the open-palm swipe with four new gestures (clap sign → Start menu, rock-on → YouTube, open hand up/down → volume, middle finger → show desktop) on top of the existing two-finger scroll, using generic hold/repeat gesture classes.

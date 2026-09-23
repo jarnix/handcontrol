@@ -1,5 +1,7 @@
 # HandControl
 
+[![tests](https://github.com/jarnix/handcontrol/actions/workflows/tests.yml/badge.svg)](https://github.com/jarnix/handcontrol/actions/workflows/tests.yml)
+
 > **Status: in development.** Gestures are being brought up one at a time against real
 > webcam recordings. Only volume control is enabled by default right now; the other
 > gestures exist but are switched off until each one is tuned. Expect thresholds and

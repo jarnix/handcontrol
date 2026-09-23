@@ -22,7 +22,7 @@
 - Scroll direction is natural: fingers move up → wheel delta negative (content moves up); fingers move down → positive.
 - Every threshold comes from `Settings`; defaults are exactly the values in spec §6.
 - Run tests with `uv run pytest -q`. Every task ends with all tests passing.
-- Commit after every task. Plain commit messages, no attribution trailers of any kind.
+- Commit after every task. Every commit message ends with the trailer `Co-authored-by: Claude Fable 5.1 <noreply@anthropic.com>` (Julien's choice on 2026-09-23: co-authored commits in merged pull requests earn the GitHub Pair Extraordinaire badge).
 - The Bash tool on this machine breaks on apostrophes inside heredocs. Create files with the Write tool, not shell heredocs.
 
 ---

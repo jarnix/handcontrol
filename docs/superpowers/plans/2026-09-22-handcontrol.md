@@ -1,5 +1,7 @@
 # HandControl Implementation Plan
 
+> **Superseded in part (2026-09-22):** the Start-menu swipe gesture (Tasks 5 and 12 steps 1-3) was replaced by the v1.1 gesture set. See `2026-09-22-handcontrol-gestures-v1.1.md` and spec v1.1.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A Windows tray app that watches the webcam with MediaPipe and turns two hand gestures into input: an open-palm upward swipe presses the Windows key, and a two-finger vertical drag scrolls the focused app in the natural direction.
@@ -20,7 +22,7 @@
 - Scroll direction is natural: fingers move up → wheel delta negative (content moves up); fingers move down → positive.
 - Every threshold comes from `Settings`; defaults are exactly the values in spec §6.
 - Run tests with `uv run pytest -q`. Every task ends with all tests passing.
-- Commit after every task. Every commit message ends with the trailer line `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` (pass it as a second `-m`).
+- Commit after every task. Every commit message ends with the trailer `Co-authored-by: Claude Fable 5.1 <noreply@anthropic.com>` (Julien's choice on 2026-09-23: co-authored commits in merged pull requests earn the GitHub Pair Extraordinaire badge).
 - The Bash tool on this machine breaks on apostrophes inside heredocs. Create files with the Write tool, not shell heredocs.
 
 ---
@@ -64,7 +66,7 @@
 **Interfaces:**
 - Produces: importable package `handcontrol` with `__version__ = "0.1.0"`; `uv run pytest` and `uv run handcontrol` work.
 
-- [ ] **Step 1: Write `pyproject.toml`**
+- [x] **Step 1: Write `pyproject.toml`**
 
 ```toml
 [project]
@@ -101,7 +103,7 @@ packages = ["handcontrol"]
 testpaths = ["tests"]
 ```
 
-- [ ] **Step 2: Write `.gitignore`**
+- [x] **Step 2: Write `.gitignore`**
 
 ```
 .venv/
@@ -113,7 +115,7 @@ __pycache__/
 *.part
 ```
 
-- [ ] **Step 3: Write `handcontrol/__init__.py`**
+- [x] **Step 3: Write `handcontrol/__init__.py`**
 
 ```python
 """HandControl: control Windows with hand gestures seen by the webcam."""
@@ -121,7 +123,7 @@ __pycache__/
 __version__ = "0.1.0"
 ```
 
-- [ ] **Step 4: Write the placeholder `handcontrol/__main__.py`**
+- [x] **Step 4: Write the placeholder `handcontrol/__main__.py`**
 
 ```python
 """Placeholder entry point; replaced by the real CLI in Task 11."""
@@ -138,7 +140,7 @@ if __name__ == "__main__":
     raise SystemExit(main())
 ```
 
-- [ ] **Step 5: Install and smoke-test**
+- [x] **Step 5: Install and smoke-test**
 
 Run: `uv sync`
 Expected: creates `.venv` and `uv.lock`; resolves mediapipe 1.0.1, opencv-python, pystray, pillow, pytest without errors.
@@ -149,11 +151,11 @@ Expected: prints `handcontrol 0.1.0`.
 Run: `uv run python -c "import mediapipe, cv2, pystray; from mediapipe.tasks.python import vision; print(mediapipe.__version__)"`
 Expected: prints `1.0.1` (MediaPipe log lines on stderr are fine).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pyproject.toml uv.lock .gitignore handcontrol/__init__.py handcontrol/__main__.py
-git commit -m "chore: scaffold uv project with mediapipe, opencv, pystray" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "chore: scaffold uv project with mediapipe, opencv, pystray"
 ```
 
 ---
@@ -176,7 +178,7 @@ git commit -m "chore: scaffold uv project with mediapipe, opencv, pystray" -m "C
   - `load_settings(path: Path | None = None) -> Settings`
   - `app_data_dir() -> Path` (`%LOCALAPPDATA%\HandControl`), `default_config_path() -> Path`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `tests/test_config.py`:
 
@@ -232,12 +234,12 @@ def test_malformed_file_falls_back_to_defaults(tmp_path):
     assert load_settings(p) == Settings()
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run pytest tests/test_config.py -q`
 Expected: FAIL with `ModuleNotFoundError: No module named 'handcontrol.config'`.
 
-- [ ] **Step 3: Write `handcontrol/config.py`**
+- [x] **Step 3: Write `handcontrol/config.py`**
 
 ```python
 """Settings with defaults, optionally overridden by a TOML file.
@@ -352,16 +354,16 @@ def load_settings(path: Path | None = None) -> Settings:
     return settings_from_dict(data)
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run pytest tests/test_config.py -q`
 Expected: `7 passed`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add handcontrol/config.py tests/test_config.py
-git commit -m "feat: settings dataclasses with TOML override" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "feat: settings dataclasses with TOML override"
 ```
 
 ---
@@ -385,7 +387,7 @@ git commit -m "feat: settings dataclasses with TOML override" -m "Co-Authored-By
   - `angle_deg(a, b, c) -> float`, `finger_extended(world, finger, min_angle_deg) -> bool`, `palm_facing_camera(landmarks, handedness) -> bool`, `palm_size(landmarks) -> float`, `palm_center(landmarks) -> Point2`
   - test helper `build_hand(extended=ALL_FINGERS, *, spread=False, handedness="Right", facing=True, center=(0.5, 0.5)) -> RawHand`, whose palm size is exactly `0.1` image units, whose `palm_center` and `two_finger_point` move 1:1 with `center`.
 
-- [ ] **Step 1: Write the synthetic hand builder**
+- [x] **Step 1: Write the synthetic hand builder**
 
 `tests/handbuilder.py`:
 
@@ -457,7 +459,7 @@ def build_hand(
     return RawHand(landmarks=landmarks, world=world, handedness=handedness, score=0.99)
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 `tests/test_hand.py`:
 
@@ -545,12 +547,12 @@ def test_pose_carries_timestamp():
     assert pose_from_raw(build_hand(), t=12.5, settings=SETTINGS).t == 12.5
 ```
 
-- [ ] **Step 3: Run the tests to verify they fail**
+- [x] **Step 3: Run the tests to verify they fail**
 
 Run: `uv run pytest tests/test_hand.py -q`
 Expected: FAIL with `ModuleNotFoundError: No module named 'handcontrol.hand'`.
 
-- [ ] **Step 4: Write `handcontrol/hand.py`**
+- [x] **Step 4: Write `handcontrol/hand.py`**
 
 ```python
 """Pure geometry: turn 21 MediaPipe hand landmarks into a HandPose.
@@ -700,16 +702,16 @@ def pose_from_raw(raw: RawHand, t: float, settings: HandSettings) -> HandPose:
     )
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `uv run pytest tests/test_hand.py -q`
 Expected: `13 passed`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add handcontrol/hand.py tests/handbuilder.py tests/test_hand.py
-git commit -m "feat: hand pose geometry from MediaPipe landmarks" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "feat: hand pose geometry from MediaPipe landmarks"
 ```
 
 ---
@@ -729,7 +731,7 @@ git commit -m "feat: hand pose geometry from MediaPipe landmarks" -m "Co-Authore
   - `Gesture` protocol: attributes `name: str`, `state: str`; property `engaged: bool`; `update(pose: HandPose | None, t: float) -> list[Action]`; `reset() -> None`
   - `GestureEngine(gestures: Sequence[Gesture])` with `update(pose, t) -> list[Action]`, `reset()`, property `states -> dict[str, str]`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `tests/test_gesture_engine.py`:
 
@@ -804,12 +806,12 @@ def test_states_and_reset():
     assert not a.engaged
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run pytest tests/test_gesture_engine.py -q`
 Expected: FAIL with `ModuleNotFoundError: No module named 'handcontrol.actions'`.
 
-- [ ] **Step 3: Write `handcontrol/actions.py` (types only for now)**
+- [x] **Step 3: Write `handcontrol/actions.py` (types only for now)**
 
 ```python
 """Actions produced by gestures. The executor that performs them lives here too (Task 7)."""
@@ -834,7 +836,7 @@ class Scroll:
 Action = OpenStartMenu | Scroll
 ```
 
-- [ ] **Step 4: Write `handcontrol/gestures/__init__.py` (empty file) and `handcontrol/gestures/base.py`**
+- [x] **Step 4: Write `handcontrol/gestures/__init__.py` (empty file) and `handcontrol/gestures/base.py`**
 
 ```python
 """Gesture protocol and the engine that arbitrates between gestures."""
@@ -887,16 +889,16 @@ class GestureEngine:
         return {g.name: g.state for g in self.gestures}
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `uv run pytest tests/test_gesture_engine.py -q`
 Expected: `4 passed`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add handcontrol/actions.py handcontrol/gestures/__init__.py handcontrol/gestures/base.py tests/test_gesture_engine.py
-git commit -m "feat: action types and gesture engine with mutual exclusion" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "feat: action types and gesture engine with mutual exclusion"
 ```
 
 ---
@@ -911,7 +913,7 @@ git commit -m "feat: action types and gesture engine with mutual exclusion" -m "
 - Consumes: `StartMenuSettings` (Task 2), `HandPose.is_open_palm`, `palm_center`, `palm_size` (Task 3), `OpenStartMenu` (Task 4).
 - Produces: `StartMenuSwipe(settings: StartMenuSettings)` implementing `Gesture`; `name == "start_menu"`; states `IDLE`, `ARMED`, `COOLDOWN`; `engaged` is true only in `ARMED`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `tests/test_start_menu.py`:
 
@@ -1004,12 +1006,12 @@ def test_threshold_scales_with_palm_size():
     assert run(g2, rising(0.62, 0.5, 6)) == []
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run pytest tests/test_start_menu.py -q`
 Expected: FAIL with `ModuleNotFoundError: No module named 'handcontrol.gestures.start_menu'`.
 
-- [ ] **Step 3: Write `handcontrol/gestures/start_menu.py`**
+- [x] **Step 3: Write `handcontrol/gestures/start_menu.py`**
 
 ```python
 """Open palm facing the camera, swept upward -> OpenStartMenu."""
@@ -1062,16 +1064,16 @@ class StartMenuSwipe:
         return []
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run pytest tests/test_start_menu.py -q`
 Expected: `8 passed`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add handcontrol/gestures/start_menu.py tests/test_start_menu.py
-git commit -m "feat: start-menu open-palm swipe gesture" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "feat: start-menu open-palm swipe gesture"
 ```
 
 ---
@@ -1086,7 +1088,7 @@ git commit -m "feat: start-menu open-palm swipe gesture" -m "Co-Authored-By: Cla
 - Consumes: `ScrollSettings` (Task 2), `HandPose.is_two_finger`, `two_finger_point`, `palm_size` (Task 3), `Scroll` (Task 4), `GestureEngine` and `StartMenuSwipe` for the arbitration test.
 - Produces: `TwoFingerScroll(settings: ScrollSettings)` implementing `Gesture`; `name == "scroll"`; states `IDLE`, `TRACKING`; `engaged` true while `TRACKING`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `tests/test_two_finger_scroll.py`:
 
@@ -1217,12 +1219,12 @@ def test_engine_scroll_in_progress_blocks_start_menu():
     assert OpenStartMenu() not in actions
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run pytest tests/test_two_finger_scroll.py -q`
 Expected: FAIL with `ModuleNotFoundError: No module named 'handcontrol.gestures.two_finger_scroll'`.
 
-- [ ] **Step 3: Write `handcontrol/gestures/two_finger_scroll.py`**
+- [x] **Step 3: Write `handcontrol/gestures/two_finger_scroll.py`**
 
 ```python
 """Index + middle finger joined, moved vertically -> Scroll (natural direction)."""
@@ -1295,21 +1297,21 @@ class TwoFingerScroll:
         return [Scroll(notches)]
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run pytest tests/test_two_finger_scroll.py -q`
 Expected: `11 passed`.
 
-- [ ] **Step 5: Run the whole suite**
+- [x] **Step 5: Run the whole suite**
 
 Run: `uv run pytest -q`
 Expected: all tests pass (7 + 13 + 4 + 8 + 11 = 43).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add handcontrol/gestures/two_finger_scroll.py tests/test_two_finger_scroll.py
-git commit -m "feat: two-finger natural scroll gesture" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "feat: two-finger natural scroll gesture"
 ```
 
 ---
@@ -1328,7 +1330,7 @@ git commit -m "feat: two-finger natural scroll gesture" -m "Co-Authored-By: Clau
   - `actions.InputBackend` protocol with exactly those five functions (the `winput` module satisfies it)
   - `actions.ActionExecutor(backend: InputBackend, wheel_step: int = 120)` with `execute(action: Action) -> None`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `tests/test_actions.py`:
 
@@ -1396,12 +1398,12 @@ def test_wheel_step_is_configurable():
     assert b.calls == [("scroll_wheel", 120)]
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run pytest tests/test_actions.py -q`
 Expected: FAIL with `ImportError: cannot import name 'VK_LWIN'`.
 
-- [ ] **Step 3: Append the backend protocol and executor to `handcontrol/actions.py`**
+- [x] **Step 3: Append the backend protocol and executor to `handcontrol/actions.py`**
 
 Add below `Action = OpenStartMenu | Scroll` (and add `from typing import Protocol` plus `import logging` to the imports):
 
@@ -1452,7 +1454,7 @@ class ActionExecutor:
             self.backend.set_cursor_pos((left + right) // 2, (top + bottom) // 2)
 ```
 
-- [ ] **Step 4: Write `handcontrol/winput.py`**
+- [x] **Step 4: Write `handcontrol/winput.py`**
 
 ```python
 """Thin ctypes wrappers over user32 for input injection. Windows only."""
@@ -1567,12 +1569,12 @@ def foreground_window_rect() -> tuple[int, int, int, int] | None:
     return rect.left, rect.top, rect.right, rect.bottom
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `uv run pytest tests/test_actions.py -q`
 Expected: `6 passed`.
 
-- [ ] **Step 6: Manually verify real injection**
+- [x] **Step 6: Manually verify real injection**
 
 Open a long web page or document, leave the mouse over it, and run:
 
@@ -1590,11 +1592,11 @@ uv run python -c "import time; from handcontrol import winput; time.sleep(2); wi
 
 Expected: the Start menu opens after 2 s. Press Escape to close it.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add handcontrol/winput.py handcontrol/actions.py tests/test_actions.py
-git commit -m "feat: Windows input injection and action executor" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "feat: Windows input injection and action executor"
 ```
 
 ---
@@ -1614,7 +1616,7 @@ git commit -m "feat: Windows input injection and action executor" -m "Co-Authore
   - `Camera(index: int, width: int, height: int)` with `read() -> np.ndarray | None` (BGR; opens lazily, releases itself on failure so the next `read` retries), `release()`, `is_open`
   - `HandTracker(model_path: Path, settings: TrackerSettings, num_hands: int = 1)` with `detect(frame_bgr, timestamp_ms: int) -> list[RawHand]` and `close()`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `tests/test_model.py`:
 
@@ -1660,12 +1662,12 @@ def test_failure_raises_oserror_and_leaves_no_partial_file(tmp_path):
     assert list(tmp_path.iterdir()) == []
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run pytest tests/test_model.py -q`
 Expected: FAIL with `ModuleNotFoundError: No module named 'handcontrol.model'`.
 
-- [ ] **Step 3: Write `handcontrol/model.py`**
+- [x] **Step 3: Write `handcontrol/model.py`**
 
 ```python
 """Locate or download the MediaPipe hand landmarker model."""
@@ -1709,12 +1711,12 @@ def ensure_model(path: Path, fetch: Fetch = _download) -> Path:
     return path
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run pytest tests/test_model.py -q`
 Expected: `3 passed`.
 
-- [ ] **Step 5: Write `handcontrol/camera.py`**
+- [x] **Step 5: Write `handcontrol/camera.py`**
 
 ```python
 """Webcam capture: lazy open, self-healing read, explicit release."""
@@ -1777,7 +1779,7 @@ class Camera:
             self._cap = None
 ```
 
-- [ ] **Step 6: Write `handcontrol/tracker.py`**
+- [x] **Step 6: Write `handcontrol/tracker.py`**
 
 ```python
 """MediaPipe HandLandmarker wrapper (Tasks API, VIDEO mode, synchronous, CPU)."""
@@ -1832,7 +1834,7 @@ class HandTracker:
         self._landmarker.close()
 ```
 
-- [ ] **Step 7: Manually verify capture and tracking together**
+- [x] **Step 7: Manually verify capture and tracking together**
 
 Write this throwaway script to the scratchpad directory as `check_tracker.py` (Write tool, not a heredoc):
 
@@ -1874,11 +1876,11 @@ Sit in front of the webcam with one hand raised and run: `uv run python <scratch
 
 Expected: the model downloads on first run to `%LOCALAPPDATA%\HandControl\models\`; then roughly `90 frames in 3.xs = 25-30 fps, hand seen in 80+` and a handedness line. If fps is below 15, check the camera log line for the negotiated resolution.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add handcontrol/model.py handcontrol/camera.py handcontrol/tracker.py tests/test_model.py
-git commit -m "feat: camera capture, MediaPipe hand tracker and model download" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "feat: camera capture, MediaPipe hand tracker and model download"
 ```
 
 ---
@@ -1892,7 +1894,7 @@ git commit -m "feat: camera capture, MediaPipe hand tracker and model download" 
 - Consumes: `RawHand`, `HandPose`, `Finger` (Task 3).
 - Produces: `Preview()` with `draw(frame_bgr, raw: RawHand | None, pose: HandPose | None, states: dict[str, str]) -> None`, `close() -> None`, attribute `is_open: bool`. Must be called from one thread only (OpenCV HighGUI rule).
 
-- [ ] **Step 1: Write `handcontrol/preview.py`**
+- [x] **Step 1: Write `handcontrol/preview.py`**
 
 ```python
 """Debug preview window: landmarks on the mirrored frame, finger flags, gesture states, fps."""
@@ -1969,7 +1971,7 @@ class Preview:
         self.is_open = False
 ```
 
-- [ ] **Step 2: Verify it imports and the full suite still passes**
+- [x] **Step 2: Verify it imports and the full suite still passes**
 
 Run: `uv run python -c "from handcontrol.preview import Preview; print(Preview().is_open)"`
 Expected: `False`.
@@ -1977,11 +1979,11 @@ Expected: `False`.
 Run: `uv run pytest -q`
 Expected: all tests pass.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add handcontrol/preview.py
-git commit -m "feat: debug preview window" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "feat: debug preview window"
 ```
 
 ---
@@ -1998,7 +2000,7 @@ git commit -m "feat: debug preview window" -m "Co-Authored-By: Claude Fable 5.1 
   - `make_icon(state: State, size: int = 64) -> PIL.Image.Image`
   - `Tray(*, on_enabled_changed: Callable[[bool], None], on_preview_changed: Callable[[bool], None], on_quit: Callable[[], None], preview: bool = False)` with `run(ready: Callable[[], None]) -> None` (blocks; calls `ready()` once the icon is visible), `stop()`, `set_state(state: State, text: str)`, `notify(message: str)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/test_tray.py`:
 
@@ -2015,12 +2017,12 @@ def test_icons_are_square_rgba_and_coloured_by_state():
     assert len({running.getpixel((4, 32)), disabled.getpixel((4, 32)), error.getpixel((4, 32))}) == 3
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `uv run pytest tests/test_tray.py -q`
 Expected: FAIL with `ModuleNotFoundError: No module named 'handcontrol.tray'`.
 
-- [ ] **Step 3: Write `handcontrol/tray.py`**
+- [x] **Step 3: Write `handcontrol/tray.py`**
 
 ```python
 """System tray icon and menu (pystray). Runs on the main thread."""
@@ -2118,12 +2120,12 @@ class Tray:
         self._icon.stop()
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `uv run pytest tests/test_tray.py -q`
 Expected: `1 passed`.
 
-- [ ] **Step 5: Manually verify the tray**
+- [x] **Step 5: Manually verify the tray**
 
 Write this throwaway script to the scratchpad directory as `check_tray.py` (Write tool, not a heredoc):
 
@@ -2149,11 +2151,11 @@ Run: `uv run python <scratchpad>/check_tray.py`
 
 Expected: a red disc with a hand glyph appears in the tray; hovering shows `HandControl - test tooltip`; right-click shows Enabled (checked), Show preview, Quit; toggling prints `enabled False` / `preview True`; Quit exits the process.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add handcontrol/tray.py tests/test_tray.py
-git commit -m "feat: system tray icon and menu" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "feat: system tray icon and menu"
 ```
 
 ---
@@ -2169,7 +2171,7 @@ git commit -m "feat: system tray icon and menu" -m "Co-Authored-By: Claude Fable
 - Consumes: everything above. `App(settings: Settings, model_path: Path, *, preview: bool = False, use_tray: bool = True)` with `run()`, `quit()`, `start_pipeline()`, `stop_pipeline()`.
 - Produces: `parse_args(argv) -> argparse.Namespace` with `preview`, `no_tray`, `camera`, `config`, `verbose`; `configure_logging(verbose: bool)`; `main(argv=None) -> int`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `tests/test_main.py`:
 
@@ -2191,12 +2193,12 @@ def test_all_flags():
     assert a.config == Path("c.toml")
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run pytest tests/test_main.py -q`
 Expected: FAIL with `ImportError: cannot import name 'parse_args'`.
 
-- [ ] **Step 3: Write `handcontrol/app.py`**
+- [x] **Step 3: Write `handcontrol/app.py`**
 
 ```python
 """Application lifecycle: tray on the main thread, gesture pipeline on a worker thread."""
@@ -2357,7 +2359,7 @@ class App:
             camera.release()
 ```
 
-- [ ] **Step 4: Replace `handcontrol/__main__.py`**
+- [x] **Step 4: Replace `handcontrol/__main__.py`**
 
 ```python
 """Command-line entry point. Also used by the ``handcontrol-gui`` script under pythonw."""
@@ -2431,26 +2433,26 @@ if __name__ == "__main__":
     raise SystemExit(main())
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `uv run pytest -q`
 Expected: all tests pass (previous 43 + 6 actions + 3 model + 1 tray + 2 main = 55).
 
-- [ ] **Step 6: Run the app end to end in console mode**
+- [x] **Step 6: Run the app end to end in console mode**
 
 Run: `uv run handcontrol --preview --no-tray -v`
 Expected: the log shows the camera opening at 1280x720; a mirrored preview window appears with landmarks on your hand, finger flags like `th+ in+ mi+ ri+ pi+`, `facing=True` with your palm toward the camera, and `scroll: IDLE`, `start_menu: ARMED` when the palm is open. Raise the open hand quickly: the Start menu opens and the log shows `action: OpenStartMenu()`. Put the Start menu away, focus a scrollable window, hold index+middle together and move them: the log shows `action: Scroll(...)` and the window scrolls. Ctrl+C exits cleanly with no traceback.
 
-- [ ] **Step 7: Run the app in tray mode**
+- [x] **Step 7: Run the app in tray mode**
 
 Run: `uv run handcontrol`
 Expected: green tray icon with tooltip `HandControl - running`; Show preview opens and closes the preview window; unchecking Enabled turns the webcam LED off and the icon grey; re-checking turns it back on; Quit exits. Then simulate a missing camera with a wrong index: `uv run handcontrol --camera 9` gives a red icon with tooltip `camera unavailable, retrying`, and Quit still works.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add handcontrol/app.py handcontrol/__main__.py tests/test_main.py
-git commit -m "feat: app lifecycle, pipeline thread and CLI" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "feat: app lifecycle, pipeline thread and CLI"
 ```
 
 ---
@@ -2464,9 +2466,9 @@ git commit -m "feat: app lifecycle, pipeline thread and CLI" -m "Co-Authored-By:
 
 **Interfaces:** none new.
 
-- [ ] **Step 1: Confirm the palm-facing rule on real frames**
+- [x] **Step 1: Confirm the palm-facing rule on real frames**
 
-Run `uv run handcontrol --preview --no-tray -v`. Show the right hand, palm to camera: preview must read `facing=True`; turn the back of the hand to the camera: `facing=False`. Repeat with the left hand. If either hand is inverted, the comparison in `palm_facing_camera()` in `handcontrol/hand.py` has the wrong handedness branch: swap `"Right"` for `"Left"` in the return line, update the docstring derivation, rerun `uv run pytest -q` (the builder in `tests/handbuilder.py` encodes the same convention, so also flip its `mirror = (handedness == "Right") != facing` to `== "Left"`), and re-check in the preview.
+Already measured offline on MediaPipe's sample photos (victory.jpg and pointing_up.jpg are palms, thumbs_up.jpg is knuckles-forward): the rule in `palm_facing_camera()` was inverted from the first derivation and fixed, with the builder in `tests/handbuilder.py` flipped to match. Confirm live: run `uv run handcontrol --preview --no-tray -v`. Show the right hand, palm to camera: preview must read `facing=True`; turn the back of the hand to the camera: `facing=False`. Repeat with the left hand. If either hand is inverted, swap the `z < 0` / `z > 0` branches in the return line of `palm_facing_camera()`, flip `mirror = (handedness == "Right") == facing` in the builder to `!=`, update both docstrings, and rerun `uv run pytest -q`.
 
 - [ ] **Step 2: Tune finger thresholds**
 
@@ -2480,7 +2482,7 @@ Raise the open palm at a natural speed ten times: it should fire every time and 
 
 In a browser, scroll a long page with the two-finger gesture. Adjust `gain_notches_per_palm` (3-8) so a comfortable hand movement scrolls about a screenful, `deadzone_palms` so a steady hand does not scroll, and `smoothing` (0.3-0.7) if motion feels jittery or laggy. Confirm the natural direction: fingers up moves the content up.
 
-- [ ] **Step 5: Write the changed defaults back**
+- [x] **Step 5: Write the changed defaults back**
 
 Update the default values in `handcontrol/config.py` and the table in spec section 6 to the tuned numbers. `test_defaults_match_spec` in `tests/test_config.py` must be updated to the same numbers.
 
@@ -2497,7 +2499,7 @@ Expected: all tests pass.
 
 Note any item that fails and fix it before moving on.
 
-- [ ] **Step 7: Write `README.md`**
+- [x] **Step 7: Write `README.md`**
 
 ```markdown
 # HandControl
@@ -2575,7 +2577,7 @@ If Step 5 changed any default, put the tuned numbers in this table too.
 
 ```bash
 git add README.md handcontrol/config.py tests/test_config.py docs/superpowers/specs/2026-09-22-handcontrol-design.md
-git commit -m "docs: README, tuned gesture defaults" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+git commit -m "docs: README, tuned gesture defaults"
 ```
 
 ---
